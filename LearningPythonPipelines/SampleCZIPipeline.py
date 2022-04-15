@@ -15,7 +15,7 @@ for root, subdirs, files in os.walk("."):
         print(len(path) * '---', file)   
 
 # Use a path for the files of interest, can be a parent folder or a specific subdirectory
-path = "BatchInput/"
+path = "PSD95-Images/"
 search_str = "*.ti*"
 filepath_list = []
 
@@ -25,25 +25,83 @@ for path, subdirs, files in os.walk(path):
             print(filepath)
             filepath_list.append(filepath)
             
-# At this point, I believe it would be possible to continue the for loop, but for cleaner code could also separate out and then iterate on the new list. I believe that creating the list of files is a good stopping point, but maybe processing them first would be good so as not to fill up the whole memory. Could also use functions and then place in above code, but I daresay this is less readable (although more similar to imageJ-scripting)
+import napari
+from aicsimageio import AICSImage
+img = AICSImage(filepath_list[2])
+print(img.dims)
 
 
-# Pre-processing here. 1) load in image 2) process 3) save output to list. This should save memory compared to bringing in all images and printing. UNLESS there is a need to see all the raw images in python, which there may be, but that can be saved into it's own list
-from matplotlib import pyplot as plt
-from skimage import io
-from skimage.filters import gaussian
+#https://allencellmodeling.github.io/aicsimageio/_static/v3/
+viewer = napari.Viewer()
+#viewer.add_image(img.data, name = 'raw') # or raw.dask_data. Remember that the attribute is needed because the AICSimage class incorporates many things in the meta data 
+# napari.view_image(raw.dask_data)
+viewer.add_image(img.data, channel_axis = 1, name = img.channel_names)
 
-rawimage_list = []
-preprocess_list = []
+# Import scikit-image's filtering module
+from skimage import filters
+from skimage import exposure
+from skimage import morphology
+from skimage import feature
+from skimage import measure
+from skimage import segmentation
+from skimage import restoration
+from scipy import ndimage
+import numpy as np
 
-for image in filepath_list:
-    raw = io.imread(image, as_gray = True)
-    plt.imshow(raw)
-    rawimage_list.append(raw)
-    gaussian_img = gaussian(raw, sigma = 1, mode = 'constant', cval = 0.0)
-    plt.imshow(gaussian_img)
-    preprocess_list.append(gaussian_img)
+#The .data and .xarray_data properties will load the whole scene into memory. The .get_image_data function will load the whole scene into memory and then retrieve the specified chunk.
+C0 = img.get_image_data("YX",C=0) #keep only the data in the parantheses, select by channel type)
+viewer.add_image(C0)
 
-   
-plt.imshow(rawimage_list[1])
-plt.imshow(preprocess_list[1])
+LoG = ndimage.gaussian_laplace(C0, sigma = 2)
+viewer.add_image(LoG, name = "LoG")
+viewer.add_image(filters.difference_of_gaussians(C0, low_sigma = 1, high_sigma = 2), name = 'DoG')
+
+foreground = C0 >= filters.threshold_otsu(C0)
+viewer.add_labels(foreground)
+
+## THIS IS IT HURRAY https://scikit-image.org/docs/stable/auto_examples/features_detection/plot_blob.html
+
+viewer.add_image(exposure.equalize_hist(C0))
+blobs = feature.blob_log(C0, threshold=.1)
+viewer.add_image(blobs)
+# I understand all code before this. I'm now at the processing stage hurray!
+
+
+
+foreground_processed = morphology.remove_small_holes(foreground, 60)
+foreground_processed = morphology.remove_small_objects(foreground_processed, min_size=50)
+viewer.layers['foreground'].data = foreground_processed
+distance = ndimage.distance_transform_edt(foreground_processed)
+viewer.add_image(distance);
+
+
+smoothed_distance = filters.gaussian(distance, 10)
+viewer.layers['distance'].data = smoothed_distance
+
+peak_local_max = feature.peak_local_max(
+    smoothed_distance,
+    footprint=np.ones((7, 7), dtype=np.bool),
+    indices=False,
+    labels=measure.label(foreground_processed)
+)
+peaks = np.nonzero(peak_local_max)
+
+viewer.add_points(np.array(peaks).T, name='peaks', size=5, face_color='red')
+
+
+
+new_peaks = np.round(viewer.layers['peaks'].data).astype(int).T
+seeds = np.zeros(C0.shape, dtype=bool)
+seeds[(new_peaks[0], new_peaks[1])] = 1
+
+markers = measure.label(seeds)
+nuclei_segmentation = segmentation.watershed(
+    -smoothed_distance, 
+    markers, 
+    mask=foreground_processed
+)
+
+viewer.add_labels(nuclei_segmentation);
+
+viewer.layers['nuclei_segmentation'].save('nuclei-automated-segmentation.tif', plugin='builtins');
+
