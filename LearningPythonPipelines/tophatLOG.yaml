@@ -1,0 +1,20 @@
+!!python/object:napari_workflows._workflow.Workflow
+_tasks:
+  Result of Laplacian of Gaussian (n-SimpleITK) [1]: !!python/tuple
+  - !!python/name:napari_simpleitk_image_processing.laplacian_of_gaussian_filter ''
+  - Result of top_hat_sphere (clesperanto) [1]
+  - 1.5
+  Result of median_sphere (clesperanto): !!python/tuple
+  - !!python/name:pyclesperanto_prototype.median_sphere ''
+  - Image:0
+  - null
+  - 1.0
+  - 1.0
+  - 0.0
+  Result of top_hat_sphere (clesperanto) [1]: !!python/tuple
+  - !!python/name:pyclesperanto_prototype.top_hat_sphere ''
+  - Result of median_sphere (clesperanto)
+  - null
+  - 5.0
+  - 5.0
+  - 0.0

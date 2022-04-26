@@ -1,0 +1,52 @@
+!!python/object:napari_workflows._workflow.Workflow
+_tasks:
+  Result of Laplacian of Gaussian (n-SimpleITK): !!python/tuple
+  - !!python/name:napari_simpleitk_image_processing.laplacian_of_gaussian_filter ''
+  - Result of top_hat_box (clesperanto)
+  - 1.5
+  Result of binominal_blur_filter: !!python/tuple
+  - !!python/name:napari_simpleitk_image_processing.binominal_blur_filter ''
+  - Image:0
+  - 1
+  Result of greater_or_equal_constant (clesperanto): !!python/tuple
+  - !!python/name:pyclesperanto_prototype.greater_or_equal_constant ''
+  - Result of invert_intensity
+  - null
+  - 500.0
+  Result of invert_intensity: !!python/tuple
+  - !!python/name:napari_simpleitk_image_processing.invert_intensity ''
+  - Result of Laplacian of Gaussian (n-SimpleITK)
+  Result of median_sphere (clesperanto): !!python/tuple
+  - !!python/name:pyclesperanto_prototype.median_sphere ''
+  - Image:0
+  - null
+  - 1.0
+  - 1.0
+  - 0.0
+  Result of subtract_gaussian_background (clesperanto): !!python/tuple
+  - !!python/name:pyclesperanto_prototype.subtract_gaussian_background ''
+  - Image:0
+  - null
+  - 5.0
+  - 5.0
+  - 0.0
+  Result of top_hat_box (clesperanto): !!python/tuple
+  - !!python/name:pyclesperanto_prototype.top_hat_box ''
+  - Result of median_sphere (clesperanto)
+  - null
+  - 5.0
+  - 5.0
+  - 0.0
+  Result of top_hat_sphere (clesperanto): !!python/tuple
+  - !!python/name:pyclesperanto_prototype.top_hat_sphere ''
+  - Result of binominal_blur_filter
+  - null
+  - 10.0
+  - 10.0
+  - 0.0
+  Result of voronoi_otsu_labeling (clesperanto): !!python/tuple
+  - !!python/name:pyclesperanto_prototype.voronoi_otsu_labeling ''
+  - Result of invert_intensity
+  - null
+  - 1.0
+  - 2.0

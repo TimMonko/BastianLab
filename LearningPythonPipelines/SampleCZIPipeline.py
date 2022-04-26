@@ -35,7 +35,7 @@ print(img.dims)
 viewer = napari.Viewer()
 #viewer.add_image(img.data, name = 'raw') # or raw.dask_data. Remember that the attribute is needed because the AICSimage class incorporates many things in the meta data 
 # napari.view_image(raw.dask_data)
-viewer.add_image(img.data, channel_axis = 1, name = img.channel_names)
+viewer.add_image(img.dask_data, channel_axis = 1, name = img.channel_names)
 
 # Import scikit-image's filtering module
 from skimage import filters
