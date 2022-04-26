@@ -4,6 +4,7 @@ Created on Mon Mar  7 15:16:53 2022
 Began after Tutorial 30 of APEER Micro Python tutorials
 @author: Tim M
 """
+#%% Get Image Paths
 
 import os, fnmatch
 
@@ -24,20 +25,29 @@ for path, subdirs, files in os.walk(path):
             filepath = os.path.join(path, file)
             print(filepath)
             filepath_list.append(filepath)
-            
+
+#%% Import Image Single Image to Napari
+
+# pip install napari[all]
+# pip install pyqt5==5.12.3        
+# pip install pyqtwebengine==5.12.1    
 import napari
 from aicsimageio import AICSImage
 img = AICSImage(filepath_list[2])
 print(img.dims)
 
-
 #https://allencellmodeling.github.io/aicsimageio/_static/v3/
 viewer = napari.Viewer()
 #viewer.add_image(img.data, name = 'raw') # or raw.dask_data. Remember that the attribute is needed because the AICSimage class incorporates many things in the meta data 
 # napari.view_image(raw.dask_data)
-viewer.add_image(img.dask_data, channel_axis = 1, name = img.channel_names)
+viewer.add_image(img.data, channel_axis = 1, name = img.channel_names, gamma = 0.45)
+
+#%% Filtering
 
 # Import scikit-image's filtering module
+from skimage import img_as_float
+from skimage import color
+from skimage import data
 from skimage import filters
 from skimage import exposure
 from skimage import morphology
@@ -52,9 +62,25 @@ import numpy as np
 C0 = img.get_image_data("YX",C=0) #keep only the data in the parantheses, select by channel type)
 viewer.add_image(C0)
 
+
 LoG = ndimage.gaussian_laplace(C0, sigma = 2)
 viewer.add_image(LoG, name = "LoG")
 viewer.add_image(filters.difference_of_gaussians(C0, low_sigma = 1, high_sigma = 2), name = 'DoG')
+# Need to convert to float currently is uint16
+C0_float = img_as_float(C0)
+viewer.add_image(C0_float)
+
+# I understand now, this is printing out coordinates of blobs - is this useful I honestly want a filter? 
+image = data.hubble_deep_field()[0:500, 0:500]
+image_gray = rgb2gray(image)
+image_DoG = feature.blob_dog(image_gray,  max_sigma=30, threshold=.1)
+
+
+viewer.add_image(image_DoG)
+C0_LoG = feature.blob_log(C0_float)
+C0_LoG = feature.blob_log(C0_float, min_sigma = 1, max_sigma = 5, num_sigma = 2)
+viewer.add_image(feature.blob.blob_dog(C0_float, min_sigma = 1, max_sigma = 2), name = 'blob-DoG')
+viewer.add_image(feature.blob.blob_log(C0_float, max_sigma = 2, threshold = 0.1), name = 'blob-LoG')
 
 foreground = C0 >= filters.threshold_otsu(C0)
 viewer.add_labels(foreground)
