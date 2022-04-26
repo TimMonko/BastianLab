@@ -1,0 +1,39 @@
+!!python/object:napari_workflows._workflow.Workflow
+_tasks:
+  Result of Laplacian of Gaussian (n-SimpleITK): !!python/tuple
+  - !!python/name:napari_simpleitk_image_processing.laplacian_of_gaussian_filter ''
+  - Image:0
+  - 1.0
+  Result of Rolling ball (scikit-image, nsbatwm): !!python/tuple
+  - !!python/name:napari_segment_blobs_and_things_with_membranes.subtract_background ''
+  - Result of top_hat_sphere (clesperanto)
+  - 5.0
+  Result of Voronoi-Otsu-labeling (clesperanto): !!python/tuple
+  - !!python/name:napari_pyclesperanto_assistant._napari_cle_functions.voronoi_otsu_labeling ''
+  - Result of invert_intensity
+  - 1.0
+  - 1.0
+  Result of invert_intensity: !!python/tuple
+  - !!python/name:napari_simpleitk_image_processing.invert_intensity ''
+  - Result of Laplacian of Gaussian (n-SimpleITK)
+  Result of median_sphere (clesperanto): !!python/tuple
+  - &id001 !!python/name:pyclesperanto_prototype.median_sphere ''
+  - Image:0
+  - null
+  - 1.0
+  - 1.0
+  - 0.0
+  Result of median_sphere (clesperanto) [1]: !!python/tuple
+  - *id001
+  - Result of invert_intensity
+  - null
+  - 1.0
+  - 1.0
+  - 0.0
+  Result of top_hat_sphere (clesperanto): !!python/tuple
+  - !!python/name:pyclesperanto_prototype.top_hat_sphere ''
+  - Result of median_sphere (clesperanto)
+  - null
+  - 5.0
+  - 4.0
+  - 0.0
