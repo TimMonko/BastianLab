@@ -27,7 +27,6 @@ for path, subdirs, files in os.walk(path):
             filepath_list.append(filepath)
 
 #%% Import Image Single Image to Napari
-
 # pip install napari[all]
 # pip install pyqt5==5.12.3        
 # pip install pyqtwebengine==5.12.1    
@@ -37,97 +36,77 @@ img = AICSImage(filepath_list[2])
 print(img.dims)
 
 #https://allencellmodeling.github.io/aicsimageio/_static/v3/
+#if 'viewer' not in globals():
 viewer = napari.Viewer()
+    
 #viewer.add_image(img.data, name = 'raw') # or raw.dask_data. Remember that the attribute is needed because the AICSimage class incorporates many things in the meta data 
 # napari.view_image(raw.dask_data)
-viewer.add_image(img.data, channel_axis = 1, name = img.channel_names, gamma = 0.45)
+# viewer.add_image(img.data, channel_axis = 1, name = img.channel_names, gamma = 0.45)
 
-#%% Filtering
-
-# Import scikit-image's filtering module
-from skimage import img_as_float
-from skimage import color
-from skimage import data
-from skimage import filters
-from skimage import exposure
-from skimage import morphology
-from skimage import feature
-from skimage import measure
-from skimage import segmentation
-from skimage import restoration
-from scipy import ndimage
-import numpy as np
-
-#The .data and .xarray_data properties will load the whole scene into memory. The .get_image_data function will load the whole scene into memory and then retrieve the specified chunk.
-C0 = img.get_image_data("YX",C=0) #keep only the data in the parantheses, select by channel type)
+#%% Blob Filtering
+import pyclesperanto_prototype as cle
+C0 = img.get_image_data("YX",C=0)
 viewer.add_image(C0)
 
+# median sphere
+C0_ms = cle.median_sphere(C0, None, 1.0, 1.0, 0.0)
+#viewer.add_image(C0_ms, name='Result of median_sphere (clesperanto)')
 
-LoG = ndimage.gaussian_laplace(C0, sigma = 2)
-viewer.add_image(LoG, name = "LoG")
-viewer.add_image(filters.difference_of_gaussians(C0, low_sigma = 1, high_sigma = 2), name = 'DoG')
-# Need to convert to float currently is uint16
-C0_float = img_as_float(C0)
-viewer.add_image(C0_float)
+# top hat sphere
+C0_ths = cle.top_hat_sphere(C0_ms, None, 5.0, 5.0, 0.0)
+#viewer.add_image(C0_ths, name='Result of top_hat_sphere (clesperanto)')
 
-# I understand now, this is printing out coordinates of blobs - is this useful I honestly want a filter? 
-image = data.hubble_deep_field()[0:500, 0:500]
-image_gray = rgb2gray(image)
-image_DoG = feature.blob_dog(image_gray,  max_sigma=30, threshold=.1)
+# gaussian blur
 
+C0_gb = cle.gaussian_blur(C0_ths, None, 1.0, 1.0, 0.0)
+#viewer.add_image(C0_gb, name='Result of gaussian_blur (clesperanto)')
 
-viewer.add_image(image_DoG)
-C0_LoG = feature.blob_log(C0_float)
-C0_LoG = feature.blob_log(C0_float, min_sigma = 1, max_sigma = 5, num_sigma = 2)
-viewer.add_image(feature.blob.blob_dog(C0_float, min_sigma = 1, max_sigma = 2), name = 'blob-DoG')
-viewer.add_image(feature.blob.blob_log(C0_float, max_sigma = 2, threshold = 0.1), name = 'blob-LoG')
+# laplace box
+C0_lb = cle.laplace_box(C0_gb)
+viewer.add_image(C0_lb, name='Result of laplace_box (clesperanto) [1]')
 
-foreground = C0 >= filters.threshold_otsu(C0)
-viewer.add_labels(foreground)
+#%% Blob Detection
+#viewer.add_image(filters.difference_of_gaussians(C0_lb,low_sigma = 1, high_sigma = 2))
+#DoG = feature.blob_dog(C0_lb, max_sigma=30, threshold=.1)
+#above uses peak_local_max
 
-## THIS IS IT HURRAY https://scikit-image.org/docs/stable/auto_examples/features_detection/plot_blob.html
+C0_max = cle.detect_maxima_box(C0_lb, radius_x = 2, radius_y = 2, radius_z = 0)
+#viewer.add_labels(C0_max)
+C0_otsu = cle.threshold_otsu(C0_lb)
+#viewer.add_labels(C0_otsu)
 
-viewer.add_image(exposure.equalize_hist(C0))
-blobs = feature.blob_log(C0, threshold=.1)
-viewer.add_image(blobs)
-# I understand all code before this. I'm now at the processing stage hurray!
+C0_spots = cle.binary_and(C0_max, C0_otsu)
+#viewer.add_labels(C0_spots)
 
+C0_voronoi = cle.masked_voronoi_labeling(C0_spots, C0_otsu)
+viewer.add_labels(C0_voronoi)
 
+#%% Ridge Detection
 
-foreground_processed = morphology.remove_small_holes(foreground, 60)
-foreground_processed = morphology.remove_small_objects(foreground_processed, min_size=50)
-viewer.layers['foreground'].data = foreground_processed
-distance = ndimage.distance_transform_edt(foreground_processed)
-viewer.add_image(distance);
+from skimage.filters import meijering #, sato, frangi, hessian
 
+# Gaussian Blur 
+C0s_gb = cle.gaussian_blur(C0, None, 1.0, 1.0, 0.0)
+#viewer.add_image(C0s_gb)
+# Gaussian Background Subtraction
+C0s_sgb = cle.subtract_gaussian_background(C0s_gb, None, 10.0, 10.0, 0.0)
+#viewer.add_image(C0s_sgb)
 
-smoothed_distance = filters.gaussian(distance, 10)
-viewer.layers['distance'].data = smoothed_distance
+# Meijering Ridge Filter
+C0s_mj = meijering(C0s_sgb, sigmas = range(6,12,2), black_ridges = False)
+viewer.add_image(C0s_mj) #does not work with pycl.OCLAArray
 
-peak_local_max = feature.peak_local_max(
-    smoothed_distance,
-    footprint=np.ones((7, 7), dtype=np.bool),
-    indices=False,
-    labels=measure.label(foreground_processed)
-)
-peaks = np.nonzero(peak_local_max)
+# Otsu Threshold
+C0s_mj_to = cle.threshold_otsu(C0s_mj)
+#viewer.add_labels(C0s_mj_to, name='Result of threshold_otsu (clesperanto) [1]')
 
-viewer.add_points(np.array(peaks).T, name='peaks', size=5, face_color='red')
+# Closing Labels
+C0s_mj_cl = cle.closing_labels(C0s_mj_to, None, 3.0)
+#viewer.add_labels(C0s_mj_cl)
 
+# Connected Components Labeling
 
+C0s_neurites = cle.connected_components_labeling_box(C0s_mj_cl)
+viewer.add_labels(C0s_neurites)
 
-new_peaks = np.round(viewer.layers['peaks'].data).astype(int).T
-seeds = np.zeros(C0.shape, dtype=bool)
-seeds[(new_peaks[0], new_peaks[1])] = 1
-
-markers = measure.label(seeds)
-nuclei_segmentation = segmentation.watershed(
-    -smoothed_distance, 
-    markers, 
-    mask=foreground_processed
-)
-
-viewer.add_labels(nuclei_segmentation);
-
-viewer.layers['nuclei_segmentation'].save('nuclei-automated-segmentation.tif', plugin='builtins');
-
+#%% Only Blobs on Ridges
