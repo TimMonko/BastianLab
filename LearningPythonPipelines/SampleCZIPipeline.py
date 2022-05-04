@@ -47,6 +47,10 @@ import pyclesperanto_prototype as cle
 C0 = img.get_image_data("YX",C=0)
 viewer.add_image(C0)
 
+Cdask = img.dask_data("YX") # work on this
+
+viewer.add_image(Cdask)
+
 # median sphere
 C0_ms = cle.median_sphere(C0, None, 1.0, 1.0, 0.0)
 
@@ -99,4 +103,24 @@ C0s_mj_cl = cle.closing_labels(C0s_mj_to, None, 3.0)
 C0s_neurites = cle.connected_components_labeling_box(C0s_mj_cl)
 viewer.add_labels(C0s_neurites)
 
-#%% Only Blobs on Ridges
+#%% Ridge Signed Maurer Distance Map
+import napari_simpleitk_image_processing as nsitk
+
+not_neurite = cle.binary_not(C0s_mj_to)
+
+distance_from_neurite = nsitk.signed_maurer_distance_map(not_neurite)
+
+viewer.add_image(distance_from_neurite, colormap = 'turbo') 
+
+mean_distance_map = cle.mean_intensity_map(distance_from_neurite, C0_voronoi)
+
+viewer.add_image(mean_distance_map, colormap = 'turbo')
+
+#%% Filter object
+objects_close_by_neurite = cle.exclude_labels_with_map_values_out_of_range(
+    mean_distance_map,
+    C0_voronoi,
+    minimum_value_range=-100,
+    maximum_value_range=5)
+
+viewer.add_image(objects_close_by_neurite, colormap= 'turbo')
