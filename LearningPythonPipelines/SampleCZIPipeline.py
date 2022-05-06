@@ -7,6 +7,9 @@ Began after Tutorial 30 of APEER Micro Python tutorials
 #%% Get Image Paths
 
 import os, fnmatch
+import time
+
+start = time.time()
 
 # See Current Directory structure
 for root, subdirs, files in os.walk("."):
@@ -26,6 +29,7 @@ for path, subdirs, files in os.walk(path):
             print(filepath)
             filepath_list.append(filepath)
 
+print(time.time() - start)
 #%% Import Image Single Image to Napari
 # pip install napari[all]
 # pip install pyqt5==5.12.3        
@@ -41,15 +45,15 @@ viewer = napari.Viewer()
 #viewer.add_image(img.data, name = 'raw') # or raw.dask_data. Remember that the attribute is needed because the AICSimage class incorporates many things in the meta data 
 # napari.view_image(raw.dask_data)
 # viewer.add_image(img.data, channel_axis = 1, name = img.channel_names, gamma = 0.45)
-
+print(time.time() - start)
 #%% Blob Filtering
 import pyclesperanto_prototype as cle
 C0 = img.get_image_data("YX",C=0)
 viewer.add_image(C0)
 
-Cdask = img.dask_data("YX") # work on this
+#Cdask = img.dask_data("YX") # work on this
 
-viewer.add_image(Cdask)
+#viewer.add_image(Cdask)
 
 # median sphere
 C0_ms = cle.median_sphere(C0, None, 1.0, 1.0, 0.0)
@@ -64,6 +68,7 @@ C0_gb = cle.gaussian_blur(C0_ths, None, 1.0, 1.0, 0.0)
 C0_lb = cle.laplace_box(C0_gb)
 viewer.add_image(C0_lb, name='LoG')
 
+print(time.time() - start)
 #%% Blob Detection
 # Local Maxima, automatic
 C0_max = cle.detect_maxima_box(C0_lb, radius_x = 2, radius_y = 2, radius_z = 0)
@@ -78,6 +83,7 @@ C0_spots = cle.binary_and(C0_max, C0_otsu)
 C0_voronoi = cle.masked_voronoi_labeling(C0_spots, C0_otsu)
 viewer.add_labels(C0_voronoi)
 
+print(time.time() - start)
 #%% Ridge Detection
 
 from skimage.filters import meijering #, sato, frangi, hessian
@@ -87,11 +93,11 @@ C0s_gb = cle.gaussian_blur(C0, None, 1.0, 1.0, 0.0)
 
 # Gaussian Background Subtraction
 C0s_sgb = cle.subtract_gaussian_background(C0s_gb, None, 10.0, 10.0, 0.0)
-
+print(time.time() - start)
 # Meijering Ridge Filter
 C0s_mj = meijering(C0s_sgb, sigmas = range(6,12,2), black_ridges = False)
 viewer.add_image(C0s_mj)
-
+print(time.time() - start)
 # Otsu Threshold
 C0s_mj_to = cle.threshold_otsu(C0s_mj)
 
@@ -103,6 +109,7 @@ C0s_mj_cl = cle.closing_labels(C0s_mj_to, None, 3.0)
 C0s_neurites = cle.connected_components_labeling_box(C0s_mj_cl)
 viewer.add_labels(C0s_neurites)
 
+print(time.time() - start)
 #%% Ridge Signed Maurer Distance Map
 import napari_simpleitk_image_processing as nsitk
 
@@ -116,6 +123,7 @@ mean_distance_map = cle.mean_intensity_map(distance_from_neurite, C0_voronoi)
 
 viewer.add_image(mean_distance_map, colormap = 'turbo')
 
+print(time.time() - start)
 #%% Filter object
 objects_close_by_neurite = cle.exclude_labels_with_map_values_out_of_range(
     mean_distance_map,
@@ -124,3 +132,5 @@ objects_close_by_neurite = cle.exclude_labels_with_map_values_out_of_range(
     maximum_value_range=5)
 
 viewer.add_image(objects_close_by_neurite, colormap= 'turbo')
+
+print(time.time() - start)
