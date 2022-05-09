@@ -4,6 +4,9 @@ Created on Mon Mar  7 15:16:53 2022
 Began after Tutorial 30 of APEER Micro Python tutorials
 @author: Tim M
 """
+
+
+#https://github.com/haesleinhuepf/BioImageAnalysisNotebooks/blob/main/docs/32_tiled_image_processing/tiled_nuclei_counting.ipynb 
 #%% Get Image Paths
 
 import os, fnmatch
@@ -36,6 +39,11 @@ import napari
 from aicsimageio import AICSImage 
 
 img = AICSImage(filepath_list[0])
+#img_m = AICSImage(filepath_list[0], reconstruct_mosaic = False)
+#C1 = img.get_image_dask_data("YX", C=1)
+#C1_m = img_m.get_image_dask_data("MYX", C=1)
+
+
 print(img.dims)
 
 import pyclesperanto_prototype as cle
@@ -46,7 +54,7 @@ print("Import: ", time.time() - start)
 if 'viewer' not in globals():
     viewer = napari.Viewer()
     
-!nvidia-smi --query-gpu=memory.used --format=csv
+#!nvidia-smi --query-gpu=memory.used --format=csv
 
 #%% Ridge Filtering
 
@@ -71,12 +79,13 @@ print("Neurite Filtering: ", time.time() - start)
 
 #%% DAPI Filtering
 C1 = img.get_image_dask_data("YX", C=1)
-
+viewer.add_image(C1)
 C1_crop = cle.crop(C1, width = 1000, height = 1000, start_x = 7000, start_y = 7000)
 viewer.add_image(C1_crop)
 
-C1_DAPI = cle.voronoi_otsu_labeling(C1_crop, spot_sigma = 10)
-!nvidia-smi --query-gpu=memory.used --format=csv
+cle.set_wait_for_kernel_finish(True) #???
+C1_DAPI = cle.voronoi_otsu_labeling(C1, spot_sigma = 10)
+#!nvidia-smi --query-gpu=memory.used --format=csv
 viewer.add_labels(C1_DAPI)
 
 print("Blob Filtering: ",time.time() - start)
