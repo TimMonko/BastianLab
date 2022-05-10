@@ -35,39 +35,78 @@ for path, subdirs, files in os.walk(path):
 print("Directory Access: ", time.time() - start)
 
 #%% Import Image  and Display
+start = time.time()
+
 import napari
 from aicsimageio import AICSImage 
+#from aicsimageio.readers.czi_reader import CziReader
 
 img = AICSImage(filepath_list[0])
-#img_m = AICSImage(filepath_list[0], reconstruct_mosaic = False)
-#C1 = img.get_image_dask_data("YX", C=1)
-#C1_m = img_m.get_image_dask_data("MYX", C=1)
-
-
 print(img.dims)
 
-import pyclesperanto_prototype as cle
-cle.get_device()
-
-print("Import: ", time.time() - start)
 
 if 'viewer' not in globals():
     viewer = napari.Viewer()
     
+!nvidia-smi --query-gpu=memory.used --format=csv
+
+C1 = img.get_image_dask_data("YX", C=1)
+C1_chunk = C1.rechunk(1000)
+# viewer.add_image(C1_chunk)
+
+print("Import: ", time.time() - start)
+
+#%% Cle
+# cle.set_wait_for_kernel_finish(True) #???
+import pyclesperanto_prototype as cle
+print(cle.get_device())
+
+start = time.time()
+cle.set_wait_for_kernel_finish(True)
+C1_blur = cle.gaussian_blur(C1, None, 5, 5, 0)
+print("Cle: ",time.time() - start)
+
+!nvidia-smi --query-gpu=memory.used --format=csv
+
+start = time.time()
+C1_tophat = cle.top_hat_sphere(C1, None, 20, 20, 0)
+print("Cle: ",time.time() - start)
+#%% Skimage
+from skimage import filters, morphology
+
+start = time.time()
+C1_skiblur = filters.gaussian(C1_chunk, sigma = 5)
+print("Ski: ",time.time() - start)
+
+start = time.time()
+footprint = morphology.disk(20)
+C1_skitophat = morphology.white_tophat(C1_skiblur, footprint)
+print("Ski: ",time.time() - start)
+
+#cle.set_wait_for_kernel_finish(False) #???
+
+
+viewer.add_image(C1_blur)
+
+cle.set_wait_for_kernel_finish(True) #???
+
+viewer.add_image(C1_tophat)
+    
 #!nvidia-smi --query-gpu=memory.used --format=csv
 
 #%% Ridge Filtering
-
 C0 = img.get_image_dask_data("YX", C=0)
+viewer.add_image(C0)
 cle.push(C0)
 
-C0_crop = cle.crop(C0, width = 1000, height = 1000, start_x = 7000, start_y = 7000)
+#C0_crop = cle.crop(C0, width = 1000, height = 1000, start_x = 7000, start_y = 7000)
 viewer.add_image(C0_crop)
 
 #C0_blur = cle.gaussian_blur(C0_crop, None, 1, 1, 0)
 #viewer.add_image(C0_blur)
 
 from skimage.filters import meijering #, sato, frangi, hessian
+
 
 C0_mj = meijering(C0_crop, sigmas = range(1,5,1), black_ridges = False) # Meijering Ridge Filter
 viewer.add_image(C0_mj)
@@ -80,13 +119,14 @@ print("Neurite Filtering: ", time.time() - start)
 #%% DAPI Filtering
 C1 = img.get_image_dask_data("YX", C=1)
 viewer.add_image(C1)
-C1_crop = cle.crop(C1, width = 1000, height = 1000, start_x = 7000, start_y = 7000)
-viewer.add_image(C1_crop)
 
 cle.set_wait_for_kernel_finish(True) #???
-C1_DAPI = cle.voronoi_otsu_labeling(C1, spot_sigma = 10)
-!nvidia-smi --query-gpu=memory.used --format=csv
+C1_blur = cle.gaussian_blur(C1, None, 5, 5, 0)
+C1_tophat = cle.top_hat_sphere(C1_blur, None, 20, 20, 0)
+viewer.add_image(C1_tophat)
+C1_DAPI = cle.voronoi_otsu_labeling(C1_tophat, spot_sigma = 10, outline_sigma = 5)
 viewer.add_labels(C1_DAPI)
+!nvidia-smi --query-gpu=memory.used --format=csv
 
 print("Blob Filtering: ",time.time() - start)
 
