@@ -22,7 +22,7 @@ for root, subdirs, files in os.walk("."):
         print(len(path) * '---', file)   
 
 # Use a path for the files of interest, can be a parent folder or a specific subdirectory
-path = "BigDAPIMap2Images/"
+path = "2022-04-14/"
 search_str = "*.czi*"
 filepath_list = []
 
@@ -38,7 +38,7 @@ print("Directory Access: ", time.time() - start)
 import napari
 from aicsimageio import AICSImage 
 
-img = AICSImage(filepath_list[0])
+img = AICSImage(filepath_list[8])
 #img_m = AICSImage(filepath_list[0], reconstruct_mosaic = False)
 #C1 = img.get_image_dask_data("YX", C=1)
 #C1_m = img_m.get_image_dask_data("MYX", C=1)
