@@ -45,12 +45,6 @@ print(img.dims)
 
 if 'viewer' not in globals():
     viewer = napari.Viewer()
-    
-
-
-
-C1_chunk = C1.rechunk(1000)
-# viewer.add_image(C1_chunk)
 
 print("Import: ", time.time() - start)
 
@@ -109,6 +103,8 @@ viewer.add_labels(C0_neurites)
 
 print("Neurite Filtering: ", time.time() - start)
 
+#%% Overlap
+
 overlap = cle.label_nonzero_pixel_count_ratio_map(C1_DAPI, C0_neurites)
 viewer.add_image(overlap)
 
@@ -117,10 +113,10 @@ viewer.add_labels(DAPI_MAP2)
 
 #%% Blob Labelling - redo this to work with Big imagE? 
 
-C0_max = cle.detect_maxima_box(C0_lb, radius_x = 2, radius_y = 2, radius_z = 0) #Local Maxima, automatic
-C0_otsu = cle.threshold_otsu(C0_lb)
-C0_spots = cle.binary_and(C0_max, C0_otsu) # Create binary where local maxima AND Otsu blobs exist
-C0_blobs = cle.masked_voronoi_labeling(C0_spots, C0_otsu) # Convert binary map to label map and watershed with voronoi
+# C0_max = cle.detect_maxima_box(C0_lb, radius_x = 2, radius_y = 2, radius_z = 0) #Local Maxima, automatic
+# C0_otsu = cle.threshold_otsu(C0_lb)
+# C0_spots = cle.binary_and(C0_max, C0_otsu) # Create binary where local maxima AND Otsu blobs exist
+# C0_blobs = cle.masked_voronoi_labeling(C0_spots, C0_otsu) # Convert binary map to label map and watershed with voronoi
 
-viewer.add_labels(C0_blobs)
-print("Blob Labeling: ", time.time() - start)
+# viewer.add_labels(C0_blobs)
+# print("Blob Labeling: ", time.time() - start)

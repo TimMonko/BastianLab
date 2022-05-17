@@ -1,0 +1,122 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<ImageMetadata>
+  <CustomAttributes>
+    <OverviewImageScalingFactor>1</OverviewImageScalingFactor>
+  </CustomAttributes>
+  <Information>
+    <Document>
+      <SubType></SubType>
+      <UserName>Bastian Lab</UserName>
+    </Document>
+    <Image>
+      <SizeX>45</SizeX>
+      <SizeY>45</SizeY>
+      <SizeC>1</SizeC>
+      <SizeZ>1</SizeZ>
+      <PixelType>Bgr24</PixelType>
+      <ComponentBitCount>8</ComponentBitCount>
+      <Dimensions>
+        <Channels>
+          <Channel Id="Channel:0">
+            <PixelType>Bgr24</PixelType>
+            <ComponentBitCount>8</ComponentBitCount>
+            <IlluminationWavelength />
+            <DetectionWavelength />
+          </Channel>
+        </Channels>
+        <T>
+          <StartTime>0001-01-01T00:00:00</StartTime>
+        </T>
+        <Z>
+          <XYZHandedness>Undefined</XYZHandedness>
+          <ZAxisDirection>Undefined</ZAxisDirection>
+          <StartPosition>0</StartPosition>
+          <Positions>
+            <List>
+              <Offsets>0</Offsets>
+            </List>
+          </Positions>
+        </Z>
+      </Dimensions>
+    </Image>
+    <Instrument />
+    <Processing>
+      <PSF>
+        <NAObjective>1.2</NAObjective>
+        <EffectiveNA>NaN</EffectiveNA>
+        <Dimension>TransverseSection</Dimension>
+        <PupilGeometry>Circular</PupilGeometry>
+        <LateralMagnification>50</LateralMagnification>
+        <OptovarMagnification>NaN</OptovarMagnification>
+        <UsedCoverglassIndex>1.515</UsedCoverglassIndex>
+        <UsedCoverglassThickness>170</UsedCoverglassThickness>
+        <UsedImmersionIndex>1.33</UsedImmersionIndex>
+        <DesignImmersionIndex>1.33</DesignImmersionIndex>
+        <DesignCoverglassIndex>1.515</DesignCoverglassIndex>
+        <DesignCoverglassThickness>170</DesignCoverglassThickness>
+        <WorkingDistance>800</WorkingDistance>
+        <EmbeddingIndex>1.33</EmbeddingIndex>
+        <EmbeddingThickness>0</EmbeddingThickness>
+        <ZStackDirection>Unknown</ZStackDirection>
+        <Type>PSF</Type>
+        <ComplexExpansion>false</ComplexExpansion>
+        <Channels>
+          <c0>
+            <Instrument>ConventionalMicroscope</Instrument>
+            <Illumination>EpiFluorescent</Illumination>
+            <TransverseResolution>0.26776110245978219</TransverseResolution>
+            <AxialResolution>0.637605943585823</AxialResolution>
+            <DetectionWavelength>509</DetectionWavelength>
+            <IlluminationWavelength>469</IlluminationWavelength>
+            <ImageFormation>Incoherent</ImageFormation>
+          </c0>
+        </Channels>
+      </PSF>
+    </Processing>
+  </Information>
+  <Scaling>
+    <Metadata />
+    <AutoScaling>
+      <Type>Measured</Type>
+      <CreationDateTime>05/17/2022 21:33:24</CreationDateTime>
+    </AutoScaling>
+    <Items>
+      <Distance Id="X">
+        <Value>1.816E-07</Value>
+        <Origin>22.5</Origin>
+        <Direction>1</Direction>
+      </Distance>
+      <Pixel Id="Z">
+        <Value>1</Value>
+        <Origin>0.5</Origin>
+        <Direction>-1</Direction>
+      </Pixel>
+      <Distance Id="Y">
+        <Value>1.816E-07</Value>
+        <Origin>22.5</Origin>
+        <Direction>-1</Direction>
+      </Distance>
+    </Items>
+  </Scaling>
+  <DisplaySetting>
+    <Channels>
+      <Channel Id="Channel:0" Name="509 nm">
+        <BitCountRange>8</BitCountRange>
+        <PixelType>Bgr24</PixelType>
+        <DyeName>509 nm</DyeName>
+        <IlluminationType>Fluorescence</IlluminationType>
+        <DyeMaxEmission>509</DyeMaxEmission>
+        <DyeMaxExcitation>469</DyeMaxExcitation>
+        <Color>#FF00FF17</Color>
+        <OriginalColor>#FF00FF17</OriginalColor>
+      </Channel>
+    </Channels>
+    <ToneMapping>
+      <Mode>None</Mode>
+      <EnhanceClipLimit>3</EnhanceClipLimit>
+      <EnhanceRegionSizePercentage>15</EnhanceRegionSizePercentage>
+    </ToneMapping>
+    <ViewerRotations>0</ViewerRotations>
+  </DisplaySetting>
+  <Layers />
+</ImageMetadata>

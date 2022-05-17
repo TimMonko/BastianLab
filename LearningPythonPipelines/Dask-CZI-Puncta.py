@@ -19,8 +19,8 @@ for root, subdirs, files in os.walk("."):
         print(len(path) * '---', file)   
 
 # Use a path for the files of interest, can be a parent folder or a specific subdirectory
-path = "PSD95-Images/"
-search_str = "*.ti*"
+path = "20220517-PSD95-PunctaProjectAnalysis/"
+search_str = "*.czi*"
 filepath_list = []
 
 for path, subdirs, files in os.walk(path):
@@ -30,74 +30,78 @@ for path, subdirs, files in os.walk(path):
             filepath_list.append(filepath)
 
 print("Directory Access: ", time.time() - start)
+
 #%% Import Image  and Display
+start = time.time()
+
 import napari
 from aicsimageio import AICSImage 
 
-img = AICSImage(filepath_list[2])
+img = AICSImage(filepath_list[10])
 print(img.dims)
 
 if 'viewer' not in globals():
     viewer = napari.Viewer()
 
+print("Import: ", time.time() - start)
+
+#%% Blob Filtering
 import pyclesperanto_prototype as cle
 cle.get_device()
 
-C0 = img.get_image_dask_data("YX",C=0)
-cle.push(C0)
+start = time.time()
 
-viewer.add_image(C0)
+PSD95 = img.get_image_dask_data("YX",C=2)
+viewer.add_image(PSD95)
 
-print("Import and Display: ", time.time() - start)
+PSD95_ms = cle.median_sphere(PSD95, None, 1.0, 1.0, 0.0)
+PSD95_ths = cle.top_hat_sphere(PSD95_ms, None, 8.0, 8.0, 0.0)
+PSD95_gb = cle.gaussian_blur(PSD95_ths, None, 2.0, 2.0, 0.0)
+PSD95_lb = cle.laplace_box(PSD95_gb)
 
-#%% Blob Filtering
-
-C0_ms = cle.median_sphere(C0, None, 1.0, 1.0, 0.0)
-C0_ths = cle.top_hat_sphere(C0_ms, None, 5.0, 5.0, 0.0)
-C0_gb = cle.gaussian_blur(C0_ths, None, 1.0, 1.0, 0.0)
-C0_lb = cle.laplace_box(C0_gb)
-
-viewer.add_image(C0_lb, name='LoG')
+viewer.add_image(PSD95_lb, name='LoG')
 print("Blob Filtering: ",time.time() - start)
 
 #%% Blob Labelling
 
-C0_max = cle.detect_maxima_box(C0_lb, radius_x = 2, radius_y = 2, radius_z = 0) #Local Maxima, automatic
-C0_otsu = cle.threshold_otsu(C0_lb)
-C0_spots = cle.binary_and(C0_max, C0_otsu) # Create binary where local maxima AND Otsu blobs exist
-C0_blobs = cle.masked_voronoi_labeling(C0_spots, C0_otsu) # Convert binary map to label map and watershed with voronoi
+start = time.time()
 
-viewer.add_labels(C0_blobs)
+PSD95_max = cle.detect_maxima_box(PSD95, radius_x = 2, radius_y = 2, radius_z = 0) #Local Maxima, automatic
+PSD95_otsu = cle.threshold_otsu(PSD95_lb)
+PSD95_spots = cle.binary_and(PSD95_max, PSD95_otsu) # Create binary where local maxima AND Otsu blobs exist
+PSD95_blobs = cle.masked_voronoi_labeling(PSD95_spots, PSD95_otsu) # Convert binary map to label map and watershed with voronoi
+
+viewer.add_labels(PSD95_blobs)
 print("Blob Labeling: ", time.time() - start)
 
 #%% Ridge Filtering
 
 from skimage.filters import meijering #, sato, frangi, hessian
 
-C0s_gb = cle.gaussian_blur(C0, None, 1.0, 1.0, 0.0)# Gaussian Blur 
-C0s_sgb = cle.subtract_gaussian_background(C0s_gb, None, 10.0, 10.0, 0.0) # Gaussian Background Subtraction
-C0s_mj = meijering(C0s_sgb, sigmas = range(6,12,2), black_ridges = False) # Meijering Ridge Filter
+PSD95_gbridge = cle.gaussian_blur(PSD95, None, 1.0, 1.0, 0.0)# Gaussian Blur 
+PSD95_sgbridge = cle.subtract_gaussian_background(PSD95_gbridge, None, 10.0, 10.0, 0.0) # Gaussian Background Subtraction
+PSD95_mjridge = meijering(PSD95_sgbridge, sigmas = range(6,12,2), black_ridges = False) # Meijering Ridge Filter
 
-viewer.add_image(C0s_mj)
+viewer.add_image(PSD95_mjridge)
 print("Ridge Filtering: ", time.time() - start)
 
 #%% Ridge Labelling
 
-C0s_mj_to = cle.threshold_otsu(C0s_mj) # Otsu of Ridges, binary
-C0s_mj_cl = cle.closing_labels(C0s_mj_to, None, 3.0) # Closing Labels, binary
-C0s_neurites = cle.connected_components_labeling_box(C0s_mj_cl) # Connected Components Labeling, CCM
+PSD95_mj_to = cle.threshold_otsu(PSD95_mjridge) # Otsu of Ridges, binary
+PSD95_mj_cl = cle.closing_labels(PSD95_mj_to, None, 3.0) # Closing Labels, binary
+PSD95_neurites = cle.connected_components_labeling_box(PSD95_mj_cl) # Connected Components Labeling, CCM
 
-viewer.add_labels(C0s_neurites)
+viewer.add_labels(PSD95_neurites)
 print("Ridge Labelling: ", time.time() - start)
 
 #%% Ridge Signed Maurer Distance Map 
 
 import napari_simpleitk_image_processing as nsitk
 
-not_neurite = cle.binary_not(C0s_mj_to)
+not_neurite = cle.binary_not(PSD95_mj_to)
 distance_from_neurite = nsitk.signed_maurer_distance_map(not_neurite)
 
-mean_distance_map = cle.mean_intensity_map(distance_from_neurite, C0_blobs)
+mean_distance_map = cle.mean_intensity_map(distance_from_neurite, PSD95_blobs)
 
 viewer.add_image(mean_distance_map, colormap = 'turbo')
 print("Signed Maurer Distance Map: ", time.time() - start)
@@ -105,7 +109,7 @@ print("Signed Maurer Distance Map: ", time.time() - start)
 
 objects_close_by_neurite = cle.exclude_labels_with_map_values_out_of_range(
     mean_distance_map,
-    C0_blobs,
+    PSD95_blobs,
     minimum_value_range=-100,
     maximum_value_range=5)
 
