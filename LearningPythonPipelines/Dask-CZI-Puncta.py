@@ -37,7 +37,7 @@ start = time.time()
 import napari
 from aicsimageio import AICSImage 
 
-img = AICSImage(filepath_list[10])
+img = AICSImage(filepath_list[88])
 print(img.dims)
 
 if 'viewer' not in globals():
@@ -51,12 +51,12 @@ cle.get_device()
 
 start = time.time()
 
-PSD95 = img.get_image_dask_data("YX",C=2)
+PSD95 = img.get_image_dask_data("YX", channel_names = 'EGFP')
 viewer.add_image(PSD95)
 
 PSD95_ms = cle.median_sphere(PSD95, None, 1.0, 1.0, 0.0)
-PSD95_ths = cle.top_hat_sphere(PSD95_ms, None, 8.0, 8.0, 0.0)
-PSD95_gb = cle.gaussian_blur(PSD95_ths, None, 2.0, 2.0, 0.0)
+PSD95_ths = cle.top_hat_sphere(PSD95_ms, None, 5.0, 5.0, 0.0)
+PSD95_gb = cle.gaussian_blur(PSD95_ths, None, 1.0, 1.0, 0.0)
 PSD95_lb = cle.laplace_box(PSD95_gb)
 
 viewer.add_image(PSD95_lb, name='LoG')

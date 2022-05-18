@@ -58,9 +58,9 @@ import napari_simpleitk_image_processing as nsitk
 
 cle.get_device()
 
-for images in filepath_list:
+for images in len(filepath_list):
     img = AICSImage(filepath_list[images])
-    PSD95 = img.get_image_dask_data("YX", C=2)
+    PSD95 = img.get_image_dask_data("YX", channel_names = 'EGFP')
     
     PSD95_ms = cle.median_sphere(PSD95, None, 1.0, 1.0, 0.0)
     PSD95_ths = cle.top_hat_sphere(PSD95_ms, None, 8.0, 8.0, 0.0)
