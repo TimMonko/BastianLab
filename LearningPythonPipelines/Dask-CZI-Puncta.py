@@ -37,7 +37,7 @@ start = time.time()
 import napari
 from aicsimageio import AICSImage 
 
-img = AICSImage(filepath_list[88])
+img = AICSImage(filepath_list[125])
 print(img.dims)
 
 if 'viewer' not in globals():
@@ -47,6 +47,7 @@ print("Import: ", time.time() - start)
 
 #%% Blob Filtering
 import pyclesperanto_prototype as cle
+import napari_simpleitk_image_processing as nsitk
 cle.get_device()
 
 start = time.time()
@@ -54,32 +55,38 @@ start = time.time()
 PSD95 = img.get_image_dask_data("YX", channel_names = 'EGFP')
 viewer.add_image(PSD95)
 
-PSD95_ms = cle.median_sphere(PSD95, None, 1.0, 1.0, 0.0)
-PSD95_ths = cle.top_hat_sphere(PSD95_ms, None, 5.0, 5.0, 0.0)
-PSD95_gb = cle.gaussian_blur(PSD95_ths, None, 1.0, 1.0, 0.0)
-PSD95_lb = cle.laplace_box(PSD95_gb)
+PSD95_ms = cle.median_sphere(PSD95, None, 1.0, 1.0, 0.0) # good, 2 maybe ok
+PSD95_ths = cle.top_hat_sphere(PSD95_ms, None, 5.0, 5.0, 0.0) # good
+#PSD95_gb = cle.gaussian_blur(PSD95_ths, None, 1.0, 1.0, 0.0) # increasing this helps
+#PSD95_lb = cle.laplace_box(PSD95_gb)
 
-viewer.add_image(PSD95_lb, name='LoG')
+PSD95_logf = nsitk.laplacian_of_gaussian_filter(PSD95_ths, 1.5)
+PSD95_logf_in = nsitk.invert_intensity(PSD95_logf)
+PSD95_hmax = nsitk.h_maxima(PSD95_logf_in, 300.0)
+PSD95_blobs = cle.voronoi_otsu_labeling(PSD95_hmax, None, 1.0, 1.0)
+
+viewer.add_image(PSD95_hmax, name='LoG-H-Max')
+viewer.add_labels(PSD95_blobs)
 print("Blob Filtering: ",time.time() - start)
 
 #%% Blob Labelling
 
-start = time.time()
+# start = time.time()
 
-PSD95_max = cle.detect_maxima_box(PSD95, radius_x = 2, radius_y = 2, radius_z = 0) #Local Maxima, automatic
-PSD95_otsu = cle.threshold_otsu(PSD95_lb)
-PSD95_spots = cle.binary_and(PSD95_max, PSD95_otsu) # Create binary where local maxima AND Otsu blobs exist
-PSD95_blobs = cle.masked_voronoi_labeling(PSD95_spots, PSD95_otsu) # Convert binary map to label map and watershed with voronoi
+# PSD95_max = cle.detect_maxima_box(PSD95, radius_x = 2, radius_y = 2, radius_z = 0) #Local Maxima, automatic
+# PSD95_otsu = cle.threshold_otsu(PSD95_lb)
+# PSD95_spots = cle.binary_and(PSD95_max, PSD95_otsu) # Create binary where local maxima AND Otsu blobs exist
+# PSD95_blobs = cle.masked_voronoi_labeling(PSD95_spots, PSD95_otsu) # Convert binary map to label map and watershed with voronoi
 
-viewer.add_labels(PSD95_blobs)
-print("Blob Labeling: ", time.time() - start)
+# viewer.add_labels(PSD95_blobs)
+# print("Blob Labeling: ", time.time() - start)
 
 #%% Ridge Filtering
 
 from skimage.filters import meijering #, sato, frangi, hessian
 
 PSD95_gbridge = cle.gaussian_blur(PSD95, None, 1.0, 1.0, 0.0)# Gaussian Blur 
-PSD95_sgbridge = cle.subtract_gaussian_background(PSD95_gbridge, None, 10.0, 10.0, 0.0) # Gaussian Background Subtraction
+PSD95_sgbridge = cle.subtract_gaussian_background(PSD95_gbridge, None, 10.0, 10.0, 0.0) # Gaussian Background Subtraction # Use for puncta?
 PSD95_mjridge = meijering(PSD95_sgbridge, sigmas = range(6,12,2), black_ridges = False) # Meijering Ridge Filter
 
 viewer.add_image(PSD95_mjridge)
@@ -99,6 +106,7 @@ print("Ridge Labelling: ", time.time() - start)
 import napari_simpleitk_image_processing as nsitk
 
 not_neurite = cle.binary_not(PSD95_mj_to)
+viewer.add_labels(not_neurite)
 distance_from_neurite = nsitk.signed_maurer_distance_map(not_neurite)
 
 mean_distance_map = cle.mean_intensity_map(distance_from_neurite, PSD95_blobs)
@@ -115,3 +123,13 @@ objects_close_by_neurite = cle.exclude_labels_with_map_values_out_of_range(
 
 viewer.add_image(objects_close_by_neurite, colormap= 'turbo')
 print("Filter Blobs by SMD Map: ", time.time() - start)
+
+#%% Blob math
+
+num_labels = cle.maximum_of_all_pixels(objects_close_by_neurite)
+label_excl_edges = cle.exclude_labels_on_edges(objects_close_by_neurite)
+
+mean_intensity_map = cle.mean_intensity_map(PSD95, objects_close_by_neurite)
+viewer.add_image(mean_intensity_map)
+
+statistics = cle.statistics_of_labelled_pixels(PSD95, objects_close_by_neurite)
