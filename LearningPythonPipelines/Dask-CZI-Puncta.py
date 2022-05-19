@@ -57,16 +57,22 @@ viewer.add_image(PSD95)
 
 PSD95_ms = cle.median_sphere(PSD95, None, 1.0, 1.0, 0.0) # good, 2 maybe ok
 PSD95_ths = cle.top_hat_sphere(PSD95_ms, None, 5.0, 5.0, 0.0) # good
-#PSD95_gb = cle.gaussian_blur(PSD95_ths, None, 1.0, 1.0, 0.0) # increasing this helps
-#PSD95_lb = cle.laplace_box(PSD95_gb)
 
-PSD95_logf = nsitk.laplacian_of_gaussian_filter(PSD95_ths, 1.5)
-PSD95_logf_in = nsitk.invert_intensity(PSD95_logf)
-PSD95_hmax = nsitk.h_maxima(PSD95_logf_in, 300.0)
-PSD95_blobs = cle.voronoi_otsu_labeling(PSD95_hmax, None, 1.0, 1.0)
+PSD95_log = cle.laplace_box(cle.gaussian_blur(PSD95_ths, None, 1.5, 1.5, 0))
+PSD95_blobs = cle.voronoi_otsu_labeling(PSD95_log, None, 1.0, 1.0)
 
-viewer.add_image(PSD95_hmax, name='LoG-H-Max')
-viewer.add_labels(PSD95_blobs)
+
+                               
+# PSD95_logf = nsitk.laplacian_of_gaussian_filter(PSD95_ths, 1.5)
+# PSD95_logf_in = nsitk.invert_intensity(PSD95_logf)
+
+# PSD95_clemax = nsitk.h_maxima(PSD95_clelog, 300)
+# PSD95_hmax = nsitk.h_maxima(PSD95_logf_in, 300.0)
+# PSD95_blobs = cle.voronoi_otsu_labeling(PSD95_hmax, None, 1.0, 1.0)
+
+
+# viewer.add_image(PSD95_hmax, name='LoG-H-Max')
+# viewer.add_labels(PSD95_blobs)
 print("Blob Filtering: ",time.time() - start)
 
 #%% Blob Labelling
