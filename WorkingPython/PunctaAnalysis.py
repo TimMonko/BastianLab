@@ -9,7 +9,7 @@ Created on Wed May 25 09:41:55 2022
 import glob
 
 file_type = ".czi"
-file_directory = "C:/Users\TimMonko\Desktop\PunctaTest"
+file_directory = "D:\Bastian Lab\Sophie\PSD95-PunctaTest"
 glob_path = file_directory + "/*" + file_type
 print(glob_path)
 
@@ -21,6 +21,10 @@ import pyclesperanto_prototype as cle
 from skimage.filters import meijering #, sato, frangi, hessian
 import napari_simpleitk_image_processing as nsitk
 import time
+import numpy as np
+import pandas as pd
+from skimage.io import imsave
+
 
 def blob_filter(blob_image):
     PSD95_ms = cle.median_sphere(blob_image, None, 1.0, 1.0, 0.0)
@@ -64,28 +68,37 @@ def blobs_on_ridges(blob_label, ridge_label):
 #%% Image Processing 
 start_overall = time.time()
 blob_list = []
-ridge_list = []
-blobs_on_ridges_list = []
 
 for file in filenames:
     start = time.time()
     img = AICSImage(file)
-    
+    cle.set_wait_for_kernel_finish(True)
     PSD95 = img.get_image_dask_data("YX", channel_names = "EGFP")
     
     PSD95_filter_blobs = blob_filter(PSD95)
     
     PSD95_blobs = blob_label(PSD95_filter_blobs)
-    blob_list.append(PSD95_blobs)
-    
+          
     PSD95_filter_ridges = ridge_filter(PSD95)
     
     PSD95_ridges = ridge_label(PSD95_filter_ridges)
-    ridge_list.append(PSD95_ridges)
     
+    del(PSD95_filter_blobs)
+    del(PSD95_filter_ridges)
+     
     PSD95_blobs_on_PSD95_ridges = blobs_on_ridges(PSD95_blobs, PSD95_ridges)
-    blobs_on_ridges_list.append(PSD95_blobs_on_PSD95_ridges)
+    
+    blob_numpy = cle.pull(PSD95_blobs_on_PSD95_ridges).astype(np.uint16)
+    blob_list.append(blob_numpy)
+
+    num_blobs = cle.statistics_of_labelled_pixels(PSD95, PSD95_blobs_on_PSD95_ridges)
+    table = pd.DataFrame(num_blobs)
+    print(table)
+    print(table.describe)
+    # # imsave("result.tif", cle.pull(blob_numpy, blob_numpy))
              
     print(file, " took ", time.time() - start)
+    
+
 
 print("Overall Time: ", time.time() - start_overall)
