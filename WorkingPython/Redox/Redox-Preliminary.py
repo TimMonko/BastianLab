@@ -14,16 +14,12 @@ glob_path = file_directory + "/*" + file_type
 print(glob_path)
 
 filenames = glob.glob(glob_path)
-import os 
 
 #%% Function Def
 
 from aicsimageio import AICSImage
 import pyclesperanto_prototype as cle
-
-import numpy as np
 import pandas as pd
-from skimage.io import imsave
 
 def label_threshold(img, median_rad):
     median_filter = cle.median_box(img, None, radius_x = median_rad, radius_y = median_rad, radius_z = median_rad)
@@ -55,14 +51,20 @@ for file in filenames:
 
 stats_all = pd.concat(stats_list)
 
-stats_pivot = (stats_all.pivot(values = 'mean_intensity', index = ['filename','channel'], columns = 'original_label')
+stats_intensity_difference = (stats_all.pivot(values = 'mean_intensity', index = ['filename','channel'], columns = 'original_label')
                .rename(columns = {0 : 'background',
                                   1 : 'signal'})
-               .assign(intensity_difference =  lambda stats_all : stats_all.signal - stats_all.background))
+               .assign(intensity_difference =  lambda stats_all : stats_all.signal - stats_all.background)
+               )
 
-#alternatively could potentially use group_by, I think
+stats_intensity_ratio = (stats_intensity_difference.reset_index()
+               .pivot(values = 'intensity_difference', index = 'filename', columns = 'channel')
+               .assign(ratio = lambda stats_intensity_difference : stats_intensity_difference.Ex470 / stats_intensity_difference.Ex385)
+               )
 
-stats_pivot['intensity_difference'].plot.bar()
+stats_intensity_difference.plot.bar()
+stats_intensity_ratio.plot.bar(y = 'ratio')
 
-stats_pivot.to_csv(os.path.join(file_directory, 'stats.csv'))
 
+stats_intensity_difference.to_csv(os.path.join(file_directory, 'stats_intensity_difference.csv'))
+stats_intensity_ratio.to_csv(os.path.join(file_directory, 'stats_intensity_ratio.csv'))

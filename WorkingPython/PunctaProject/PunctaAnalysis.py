@@ -9,7 +9,7 @@ Created on Wed May 25 09:41:55 2022
 import glob
 
 file_type = ".czi"
-file_directory = "D:\Bastian Lab\Sophie\PSD95-PunctaTest"
+file_directory = "C:/Users/TimMonko/Desktop/PunctaTest"
 glob_path = file_directory + "/*" + file_type
 print(glob_path)
 
@@ -78,27 +78,32 @@ for file in filenames:
     PSD95_filter_blobs = blob_filter(PSD95)
     
     PSD95_blobs = blob_label(PSD95_filter_blobs)
-          
-    PSD95_filter_ridges = ridge_filter(PSD95)
     
-    PSD95_ridges = ridge_label(PSD95_filter_ridges)
+    blob_area = np.count_nonzero(PSD95_blobs) / PSD95_blobs.size
     
-    del(PSD95_filter_blobs)
-    del(PSD95_filter_ridges)
-     
-    PSD95_blobs_on_PSD95_ridges = blobs_on_ridges(PSD95_blobs, PSD95_ridges)
+    if blob_area > 0.1:  
+        print(file, " is a bad image with blob ratio ", blob_area)
+    else:
+        PSD95_filter_ridges = ridge_filter(PSD95)
+                
+        PSD95_ridges = ridge_label(PSD95_filter_ridges)
+        ridge_area = np.count_nonzero(PSD95_ridges) / PSD95_ridges.size
+        
+    if ridge_area > 0.1:
+        print(file, " is a bad image with ridge ratio ", ridge_area)
+    else:        
+        PSD95_blobs_on_PSD95_ridges = blobs_on_ridges(PSD95_blobs, PSD95_ridges)
+        
+        blob_numpy = cle.pull(PSD95_blobs_on_PSD95_ridges).astype(np.uint16)
+        blob_list.append(blob_numpy)
     
-    blob_numpy = cle.pull(PSD95_blobs_on_PSD95_ridges).astype(np.uint16)
-    blob_list.append(blob_numpy)
-
-    num_blobs = cle.statistics_of_labelled_pixels(PSD95, PSD95_blobs_on_PSD95_ridges)
-    table = pd.DataFrame(num_blobs)
-    print(table)
-    print(table.describe)
+        num_blobs = cle.statistics_of_labelled_pixels(PSD95, PSD95_blobs_on_PSD95_ridges)
+        table = pd.DataFrame(num_blobs)
+        
+        print(table)
+        print(table.describe)
     # # imsave("result.tif", cle.pull(blob_numpy, blob_numpy))
              
     print(file, " took ", time.time() - start)
     
-
-
 print("Overall Time: ", time.time() - start_overall)
