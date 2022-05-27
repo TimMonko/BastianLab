@@ -10,6 +10,7 @@ import os
 
 file_type = ".tiff"
 file_directory = "C:/Users/TimMonko/Documents/GitHub/BastianLab/WorkingPython/Redox"
+
 glob_path = file_directory + "/*" + file_type
 print(glob_path)
 

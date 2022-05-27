@@ -7,13 +7,19 @@ Created on Wed May 25 09:41:55 2022
 """
 #%% Images Paths
 import glob
+import os 
 
-file_type = ".czi"
+file_type = "*.czi"
 file_directory = "C:/Users/TimMonko/Desktop/PunctaTest"
-glob_path = file_directory + "/*" + file_type
-print(glob_path)
+os.chdir(file_directory)
 
-filenames = glob.glob(glob_path)
+label_directory = file_directory + "/Labels/"
+try: 
+    os.mkdir(label_directory)
+except OSError:
+    pass
+
+filenames = glob.glob(file_type)
 
 #%% Function Def
 from aicsimageio import AICSImage
@@ -25,11 +31,10 @@ import numpy as np
 import pandas as pd
 from skimage.io import imsave
 
-
 def blob_filter(blob_image):
     PSD95_ms = cle.median_sphere(blob_image, None, 1.0, 1.0, 0.0)
-    PSD95_ths = cle.top_hat_sphere(PSD95_ms, None, 8.0, 8.0, 0.0)
-    PSD95_gb = cle.gaussian_blur(PSD95_ths, None, 2.0, 2.0, 0.0)
+    PSD95_ths = cle.top_hat_sphere(PSD95_ms, None, 5.0, 5.0, 0.0) #lower toightens up puncta
+    PSD95_gb = cle.gaussian_blur(PSD95_ths, None, 1.0, 1.0, 0.0) # lower gauss seems important for not blurring too much
     PSD95_lb = cle.laplace_box(PSD95_gb)
     return(PSD95_lb)
 
@@ -67,43 +72,72 @@ def blobs_on_ridges(blob_label, ridge_label):
     
 #%% Image Processing 
 start_overall = time.time()
-blob_list = []
+label_ratio_list = []
+blob_labels = []
+stats_blob_list = []
 
 for file in filenames:
     start = time.time()
+    
+    blob_area = np.nan
+    ridge_area = np.nan
+    total_blobs = np.nan
+    
     img = AICSImage(file)
-    cle.set_wait_for_kernel_finish(True)
-    PSD95 = img.get_image_dask_data("YX", channel_names = "EGFP")
+
+    PSD95 = img.get_image_dask_data("YX", C = img.channel_names.index('EGFP'))
     
     PSD95_filter_blobs = blob_filter(PSD95)
     
     PSD95_blobs = blob_label(PSD95_filter_blobs)
     
-    blob_area = np.count_nonzero(PSD95_blobs) / PSD95_blobs.size
+    blob_area = np.count_nonzero(PSD95_blobs) / PSD95_blobs.size  
     
-    if blob_area > 0.1:  
-        print(file, " is a bad image with blob ratio ", blob_area)
-    else:
+    if blob_area <= 0.05:
         PSD95_filter_ridges = ridge_filter(PSD95)
                 
         PSD95_ridges = ridge_label(PSD95_filter_ridges)
         ridge_area = np.count_nonzero(PSD95_ridges) / PSD95_ridges.size
         
-    if ridge_area > 0.1:
-        print(file, " is a bad image with ridge ratio ", ridge_area)
-    else:        
-        PSD95_blobs_on_PSD95_ridges = blobs_on_ridges(PSD95_blobs, PSD95_ridges)
+        if ridge_area <= 0.1:        
+            PSD95_blobs_on_PSD95_ridges = blobs_on_ridges(PSD95_blobs, PSD95_ridges)
+            
+            blob_numpy = cle.pull(PSD95_blobs_on_PSD95_ridges).astype(np.uint16)
+            blob_labels.append(blob_numpy)
         
-        blob_numpy = cle.pull(PSD95_blobs_on_PSD95_ridges).astype(np.uint16)
-        blob_list.append(blob_numpy)
+            stats_blobs = (pd.DataFrame(cle.statistics_of_background_and_labelled_pixels(PSD95, PSD95_blobs_on_PSD95_ridges))
+                         .assign(filename = file)
+                         )
+            stats_blob_list.append(stats_blobs)
+            
+            total_blobs = stats_blobs['original_label'].max()
+            
+            fsave = label_directory + file + "_blob_labels.tif"
+            imsave(fsave, blob_numpy, check_contrast = False)
     
-        num_blobs = cle.statistics_of_labelled_pixels(PSD95, PSD95_blobs_on_PSD95_ridges)
-        table = pd.DataFrame(num_blobs)
+    label_summary = (pd.DataFrame(
+        {'blob_area' : blob_area,
+         'ridge_area' : ridge_area,
+         'total_blobs' : total_blobs},
+        index = [file]))
+    
+    print(label_summary)
+    
+    label_ratio_list.append(label_summary)
         
-        print(table)
-        print(table.describe)
-    # # imsave("result.tif", cle.pull(blob_numpy, blob_numpy))
-             
-    print(file, " took ", time.time() - start)
+    print("took ", time.time() - start)
     
 print("Overall Time: ", time.time() - start_overall)
+
+stats_all = pd.concat(stats_blob_list)
+stats_all.to_csv('stats.csv')
+
+label_summary_all = pd.concat(label_ratio_list)
+label_summary_all.to_csv('label_summary.csv')
+
+#%% Napari Viewing
+import napari
+viewer = napari.Viewer()
+viewer.add_image(PSD95)
+viewer.add_labels(PSD95_blobs_on_PSD95_ridges)
+
