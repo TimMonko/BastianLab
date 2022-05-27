@@ -10,10 +10,11 @@ import glob
 import os 
 
 file_type = "*.czi"
-file_directory = "C:/Users/TimMonko/Desktop/PunctaTest"
+file_directory = "D:/Bastian Lab/Sophie/20220517-PSD95-PunctaProjectAnalysis"
 os.chdir(file_directory)
 
-label_directory = file_directory + "/Labels/"
+# Create subdirectory to save label images to
+label_directory = file_directory + "/Labels_3/"
 try: 
     os.mkdir(label_directory)
 except OSError:
@@ -54,8 +55,8 @@ def ridge_filter(ridge_image):
 def ridge_label(ridge_image):
     PSD95_mj_to = cle.threshold_otsu(ridge_image) # Otsu of Ridges, binary
     PSD95_mj_cl = cle.closing_labels(PSD95_mj_to, None, 3.0) # Closing Labels, binary
-    PSD95_neurites = cle.connected_components_labeling_box(PSD95_mj_cl) # Connected Components Labeling, CCM
-    return(PSD95_neurites)
+    # PSD95_neurites = cle.connected_components_labeling_box(PSD95_mj_cl) # VERY TIME CONSUMING Connected Components Labeling, CCM
+    return(PSD95_mj_cl)
 
 def blobs_on_ridges(blob_label, ridge_label):
     not_neurite = cle.binary_not(ridge_label)
@@ -76,9 +77,12 @@ label_ratio_list = []
 blob_labels = []
 stats_blob_list = []
 
+cle.set_wait_for_kernel_finish(True)
+
 for file in filenames:
     start = time.time()
     
+    # rest these variables in case image is skipped
     blob_area = np.nan
     ridge_area = np.nan
     total_blobs = np.nan
@@ -99,7 +103,7 @@ for file in filenames:
         PSD95_ridges = ridge_label(PSD95_filter_ridges)
         ridge_area = np.count_nonzero(PSD95_ridges) / PSD95_ridges.size
         
-        if ridge_area <= 0.1:        
+        if ridge_area <= 0.05:        
             PSD95_blobs_on_PSD95_ridges = blobs_on_ridges(PSD95_blobs, PSD95_ridges)
             
             blob_numpy = cle.pull(PSD95_blobs_on_PSD95_ridges).astype(np.uint16)
@@ -130,10 +134,10 @@ for file in filenames:
 print("Overall Time: ", time.time() - start_overall)
 
 stats_all = pd.concat(stats_blob_list)
-stats_all.to_csv('stats.csv')
+stats_all.to_csv('stats_3.csv')
 
 label_summary_all = pd.concat(label_ratio_list)
-label_summary_all.to_csv('label_summary.csv')
+label_summary_all.to_csv('label_summary_3.csv')
 
 #%% Napari Viewing
 import napari
