@@ -9,12 +9,12 @@ Created on Wed May 25 09:41:55 2022
 import glob
 import os 
 
-file_type = "*.czi"
-file_directory = "D:/Bastian Lab/Sophie/20220517-PSD95-PunctaProjectAnalysis"
+file_type = "*.tif"
+file_directory = "C:\\Users\Bastian Lab\Desktop\PunctaCropped_Output"
 os.chdir(file_directory)
 
-# Create subdirectory to save label images to
-label_directory = file_directory + "/Labels_3/"
+# Create subdirectory to save label images to, use try except in case label folder already exists (as in instance of reruns or restarts)
+label_directory = file_directory + "/Labels/"
 try: 
     os.mkdir(label_directory)
 except OSError:
@@ -25,7 +25,7 @@ filenames = glob.glob(file_type)
 #%% Function Def
 from aicsimageio import AICSImage
 import pyclesperanto_prototype as cle
-from skimage.filters import meijering #, sato, frangi, hessian
+from skimage.filters import meijering
 import napari_simpleitk_image_processing as nsitk
 import time
 import numpy as np
@@ -66,82 +66,106 @@ def blobs_on_ridges(blob_label, ridge_label):
         mean_distance_map,
         blob_label,
         minimum_value_range=-100,
-        maximum_value_range=5)
+        maximum_value_range=8)
     return(blobs_close_by_neurite)
     
     
     
 #%% Image Processing 
+
 start_overall = time.time()
 label_ratio_list = []
-blob_labels = []
 stats_blob_list = []
 
+# Seems necessary for challenging image analyses - prevents GPU from trying to do math beyond VRAM capability, resulting in a slightly slower process but one that does not abort
 cle.set_wait_for_kernel_finish(True)
 
 for file in filenames:
     start = time.time()
     
-    # rest these variables in case image is skipped
-    blob_area = np.nan
-    ridge_area = np.nan
+    # Reset these variables in case image is skipped, so that summary table includes NaNs
+    blob_ratio = np.nan
+    ridge_ratio = np.nan
     total_blobs = np.nan
+    ridge_area = np.nan
     
+    # Import Image and extract specific channel
     img = AICSImage(file)
-
-    PSD95 = img.get_image_dask_data("YX", C = img.channel_names.index('EGFP'))
+    #PSD95 = img.get_image_data("YX", C = img.channel_names.index('EGFP'))
+    PSD95 = img.get_image_data("YX")
     
+    # Filter grayscale image blobs, then create labels for the blobs
     PSD95_filter_blobs = blob_filter(PSD95)
-    
     PSD95_blobs = blob_label(PSD95_filter_blobs)
     
-    blob_area = np.count_nonzero(PSD95_blobs) / PSD95_blobs.size  
+    # Determine area of image covered by labels (non_zero) compared to background. This can be used to filter for images which extract too many labels, indicative of poor S/B.
+    blob_ratio = np.count_nonzero(PSD95_blobs) / PSD95_blobs.size  
     
-    if blob_area <= 0.05:
-        PSD95_filter_ridges = ridge_filter(PSD95)
-                
-        PSD95_ridges = ridge_label(PSD95_filter_ridges)
-        ridge_area = np.count_nonzero(PSD95_ridges) / PSD95_ridges.size
+    # Arbitrary blob_area cut-off, but seems useful for PSD95-Puncta based images
+    if blob_ratio <= 0.05: 
         
-        if ridge_area <= 0.05:        
+        # Filter grayscale image ridges, then create labels for the ridges
+        PSD95_filter_ridges = ridge_filter(PSD95)
+        PSD95_ridges = ridge_label(PSD95_filter_ridges)
+        
+        # Determine area of image covered by labels (non_zero) compared to background. This can be used to filter for images which extract too many labels, indicative of poor S/B. 
+        ridge_area = np.count_nonzero(PSD95_ridges)
+        ridge_ratio = ridge_area / PSD95_ridges.size
+        
+        # Arbitrary ridge_ratio cut-off, but seems useful for PSD95-extracted ridges
+        if ridge_ratio <= 0.10:        
+            
+            # Function compares two label images, and extracts blobs if in proximity to ridges
             PSD95_blobs_on_PSD95_ridges = blobs_on_ridges(PSD95_blobs, PSD95_ridges)
             
-            blob_numpy = cle.pull(PSD95_blobs_on_PSD95_ridges).astype(np.uint16)
-            blob_labels.append(blob_numpy)
-        
+            # Saving stack of resulting images
+            fsave = label_directory + file + "_labels.tif"        
+            stacked_results = np.stack((PSD95, PSD95_ridges, PSD95_blobs_on_PSD95_ridges), axis = 0).astype(np.uint16)
+            imsave(fsave, stacked_results, check_contrast = False)
+            
+            # Get statistics for the background (0) and all labels (1:n), then append to list to later concatenate
             stats_blobs = (pd.DataFrame(cle.statistics_of_background_and_labelled_pixels(PSD95, PSD95_blobs_on_PSD95_ridges))
                          .assign(filename = file)
                          )
             stats_blob_list.append(stats_blobs)
             
+            stats_ridges = (pd.DataFrame(cle.statistics_of_background_and_labelled_pixels(PSD95, PSD95_ridges))
+                         .assign(filename = file)
+                         )
+            stats_blob_list.append(stats_blobs) 
+            
+            # Maximum label refers to total number of extracted blobs
             total_blobs = stats_blobs['original_label'].max()
             
-            fsave = label_directory + file + "_blob_labels.tif"
-            imsave(fsave, blob_numpy, check_contrast = False)
+
+    # Create a summary table of area ratio and total number of blobs, for later referencing
+    scale = 0.182 # img.physical_pixel_sizes.X # 0.182um x 0.182um / pixel
+    ridge_squm = ridge_area * scale * scale
     
     label_summary = (pd.DataFrame(
-        {'blob_area' : blob_area,
-         'ridge_area' : ridge_area,
-         'total_blobs' : total_blobs},
+        {'blob_ratio' : blob_ratio,
+         'ridge_ratio' : ridge_ratio,
+         'total_blobs' : total_blobs,
+         'ridge_pixel_area' : ridge_area, 
+         'pixel_size' : scale,
+         'ridge_squm' : ridge_squm,
+         'blob_per_squm' : total_blobs / ridge_squm}, 
         index = [file]))
-    
     print(label_summary)
-    
     label_ratio_list.append(label_summary)
         
-    print("took ", time.time() - start)
+    print("took ", time.time() - start, " seconds")
     
 print("Overall Time: ", time.time() - start_overall)
 
+# Using pandas, concatenate list and then save to csv
 stats_all = pd.concat(stats_blob_list)
-stats_all.to_csv('stats_3.csv')
+stats_all.to_csv('stats.csv')
 
 label_summary_all = pd.concat(label_ratio_list)
-label_summary_all.to_csv('label_summary_3.csv')
+label_summary_all.to_csv('label_summary.csv')
 
 #%% Napari Viewing
-import napari
-viewer = napari.Viewer()
-viewer.add_image(PSD95)
-viewer.add_labels(PSD95_blobs_on_PSD95_ridges)
+# import napari
+# viewer = napari.Viewer()
 
