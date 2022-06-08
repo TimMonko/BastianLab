@@ -10,7 +10,7 @@ import glob
 import os 
 
 file_type = "*.tif"
-file_directory = "C:\\Users\Bastian Lab\Desktop\PunctaCropped_Output"
+file_directory = "D:\Bastian Lab\Sophie\Date-20220517-PSD95-PunctaProjectAnalysis\Cropped_Cleared_Output"
 os.chdir(file_directory)
 
 # Create subdirectory to save label images to, use try except in case label folder already exists (as in instance of reruns or restarts)
