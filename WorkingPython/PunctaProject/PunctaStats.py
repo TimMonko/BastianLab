@@ -10,12 +10,11 @@ https://stackoverflow.com/questions/44065573/anova-for-groups-within-a-dataframe
 #%% Import and Manipulate Data
 import os
 import pandas as pd
-import matplotlib.pyplot as plt
 
-file_directory = "C:\\Users\TimMonko\Downloads"
+file_directory = "C:\\Users\Tim M\Downloads"
 os.chdir(file_directory)
 
-filepath = "C:\\Users\TimMonko\Downloads\label_summary.csv"
+filepath = "C:\\Users\Tim M\Downloads\label_summary.csv"
 raw_data = pd.read_csv(filepath)
 
 
@@ -29,12 +28,53 @@ print("number of files without full analysis:", len(raw_data)-len(data))
 
 data_grp = data.groupby("treatment")
 data_describe = data_grp.describe()
-print(data_describe)
+data_describe
 
-#print("number of files for each group: \n", data.groupby('treatment').size())
+#%% Removes outliers, but not with grouped data
+# Remove outliers with IQR method https://towardsdatascience.com/ways-to-detect-and-remove-the-outliers-404d16608dba
+
+# FULL data outliers identificationm, very different use than Grouped function below - detects overall anomolies
+Q1 = data.quantile(0.25)
+Q3 = data.quantile(0.75)
+IQR = Q3 - Q1
+
+outliers = data[((data < (Q1 - 1.5* IQR)) | (data > (Q3 + 1.5 * IQR))).any(axis =1)]
+
+data_rm = data[~data.isin(outliers)].dropna()
+
+# GROUPED data, 1 column only -- seems very similar to statsmodels outlier_test
+def is_outlier(s):
+    Q1 = s.quantile(0.25)
+    Q3 = s.quantile(0.75)
+    IQR = Q3 - Q1
+    lower_limit = Q1 - 1.5* IQR
+    upper_limit = Q3 + 1.5* IQR
+    return ~s.between(lower_limit, upper_limit)
+
+grouped_outliers = data[data_grp['blob_per_squm'].apply(is_outlier)]
+
+#%% Pingouin Stats 
+# https://pingouin-stats.org/index.html
+# https://pingouin-stats.org/guidelines.html
+# https://g0rella.github.io/gorella_mwn/intro_statistics.html
+# https://towardsdatascience.com/the-new-kid-on-the-statistics-in-python-block-pingouin-6b353a1db57c
+
+# #Pinguoin also adds methods to pd.DataFrame, so can use data.anova() for example
+import pingouin as pg
+
+# levene's but other settings available 
+hs = pg.homoscedasticity(data = data, dv = 'blob_per_squm', group = 'treatment')
+print(hs)
+
+lr = pg.anova(dv = 'blob_per_squm', between = 'treatment', data = data)
+print(lr)
+
+# posthoc
+lr_posthoc = pg.pairwise_tukey(dv = 'blob_per_squm', between = 'treatment', data = data)
+print(lr_posthoc)
 
 
-#%% Seaborn Settings
+#%% Seaborn Settings for Plotting
 import seaborn as sns
 
 # must explicitely invoke set_them else uses matplotlib defaults. Overrides all matplotlib based plots
@@ -82,45 +122,24 @@ r.set_ylabels("Puncta")
 r.figure
 r.figure.savefig('LmPlot.svg')
 
-
-#%% Tiday Day statsmodels stats https://www.reneshbedre.com/blog/anova.html
+#%% Tidy Data statsmodels stats 
+# R like syntax, much more robust, but more complex 
+# https://python.cogsci.nl/numerical/statistics/
+# https://www.reneshbedre.com/blog/anova.html
+# somewhat helpful but mostly confusing https://g0rella.github.io/gorella_mwn/intro_statistics.html
+# https://www.statsmodels.org/stable/gettingstarted.html
 
 import statsmodels.api as sm 
 from statsmodels.formula.api import ols
 
+# OLS model -- a "complicated" look at ANOVA stats, C() forces categorical
 model = ols('blob_per_squm ~ C(treatment)', data = data).fit()
+print(model.summary()) # very overwhelming output
+
+# Outliers with statsmodels
+test = model.outlier_test()
+outliers_test = test[test['bonf(p)'] < 0.05]
+
+# So, push the model through the ANOVA to simplify the output 
 anova_table = sm.stats.anova_lm(model, typ = 2)
 anova_table
-#%% Tidy Data bioinfokit stats https://www.reneshbedre.com/blog/anova.html
-
-from bioinfokit.analys import stat
-
-# ANOVA One-way
-res = stat()
-res.anova_stat(df = data, res_var='blob_per_squm', anova_model='blob_per_squm ~ C(treatment)')
-res.anova_summary
-
-# Tukey HSD post-hoc
-res.tukey_hsd(df=data, res_var='blob_per_squm', xfac_var='treatment', anova_model='blob_per_squm ~ C(treatment)')
-res.tukey_summary
-
-#%% Testing ANOVA assumptions
-# QQ-plot for testing anova assumptions
-# res.anova_std_residuals are standardized residuals obtained from ANOVA (check above)
-sm.qqplot(res.anova_std_residuals, line='45')
-plt.xlabel("Theoretical Quantiles")
-plt.ylabel("Standardized Residuals")
-plt.show()
-
-import scipy.stats as stats
-
-# Test normality 
-w, pvalue = stats.shapiro(model.resid)
-print(w, pvalue)
-
-# Levene's Non-normal Homogeneity of Variance Test
-from bioinfokit.analys import stat 
-res = stat()
-res.levene(df=data, res_var='blob_per_squm', xfac_var='treatment')
-res.levene_summary
-
