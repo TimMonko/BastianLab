@@ -143,13 +143,14 @@ for file in filenames:
     ridge_squm = ridge_area * scale * scale
     
     label_summary = (pd.DataFrame(
-        {'blob_ratio' : blob_ratio,
+        {'filename' : file,
+         'blob_ratio' : blob_ratio,
          'ridge_ratio' : ridge_ratio,
          'total_blobs' : total_blobs,
          'ridge_pixel_area' : ridge_area, 
          'pixel_size' : scale,
          'ridge_squm' : ridge_squm,
-         'blob_per_squm' : total_blobs / ridge_squm}, 
+         'blob_per_squm' : total_blobs / ridge_squm},
         index = [file]))
     print(label_summary)
     label_ratio_list.append(label_summary)
