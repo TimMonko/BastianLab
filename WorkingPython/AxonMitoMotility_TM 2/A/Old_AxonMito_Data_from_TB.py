@@ -8,14 +8,24 @@ Created on Fri Jul  1 08:51:02 2022
 #%% Import and Wrangle Data
 import os
 import pandas as pd
+import glob
 
-file_directory = r"C:\Users\TimMonko\Downloads\AxonTracing_TM 2\AxonTracing_TM 2"
+file_directory = r"C:/Users/Tim M/Documents/GitHub/BastianLab/WorkingPython/AxonMitoMotility_TM 2/A"
 os.chdir(file_directory)
 
-filepath = r"C:\Users\TimMonko\Downloads\AxonTracing_TM 2\AxonTracing_TM 2\Combined_TM.csv"
-raw_data = pd.read_csv(filepath)
+file_type = "*.csv"
+filenames = glob.glob(file_type)
 
-data = raw_data
+data_list = []
+for file in filenames:
+    val_name = file[:len(file) - 4]
+    raw_data = pd.read_csv(file)
+    melt_data = (raw_data
+                 .melt(value_name = val_name, var_name = 'Tx')
+                 .set_index('Tx'))
+    data_list.append(melt_data)
+    
+data = pd.concat(data_list, axis = 1, ignore_index = False).dropna(axis = 0).reset_index()
 
 data_describe = data.groupby("Tx").describe()
 
@@ -31,9 +41,11 @@ def dv_tests(df, dv, iv):
 
     lr = pg.anova(data = df, dv = dv, between = iv)
     print(dv + ' x ' + iv, norm, hs, lr, sep = '\n')
-    
+   
 for dvs in data.columns[data.columns != 'Tx']:
     dv_tests(data, dvs, 'Tx')
+
+# mitoc density, retro velocity, perc time retro motion, perc pausing, perc time moving, perc time anterograde motion  
 
 #%% Seaborn Settings for Plotting
 import seaborn as sns
@@ -71,24 +83,27 @@ for dvs in data.columns[data.columns != 'Tx']:
 # plots[0].figure.savefig('box.svg') # to call from list
 
 #%% PairGrid relationship plot
-#quick and dirty
+#quick and dirty, but caution on amount of variables
 
 pp = sns.pairplot(data, hue = "Tx", kind = 'reg') # default is scatter
+pp = sns.pairplot(data, hue = "Tx", kind = 'kde') # default is scatter
 
 #%% Seaborn Relational Plotting
+a = sns.residplot(x = 'Average Speed (per Mito)', y = 'Percent Time Moving', data = data)
 
 r = sns.lmplot(
-    x = 'Primary_Axon_Length', 
-    y = 'Num_Branches', 
+    x = 'Percent Time Anterograde Motion', 
+    y = 'Average Speed (per Mito)', 
     hue = 'Tx', 
     data = data)
 
 
 r = sns.lmplot(
-    y = 'Num_Branches', 
-    x = 'Total_Branch_Length', 
+    x = 'Average Speed (per Mito)', 
+    y = 'Percent Time Moving', 
     hue = 'Tx', 
-    data = data)
+    data = data,
+    logx = True)
 
 r = sns.lmplot(
     x = 'Average_Branch_Length', 
@@ -123,9 +138,10 @@ j = sns.jointplot(
 
 import statsmodels.api as sm 
 from statsmodels.formula.api import ols
+import numpy as np
 
 # OLS model -- a "complicated" look at ANOVA stats, C() forces categorical
-model = ols('Num_Branches ~ Primary_Axon_Length * C(Tx)', data = data).fit()
+model = ols('Q("Average Speed (per Mito)") ~ Q("Percent Time Moving") *  C(Tx)', data = data).fit()
 model = ols('Total_Branch_Length ~ Num_Branches * C(Tx)', data = data).fit()
 model = ols('Num_Branches ~ Average_Branch_Length * C(Tx)', data = data).fit()
 
