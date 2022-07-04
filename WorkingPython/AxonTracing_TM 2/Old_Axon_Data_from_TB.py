@@ -9,14 +9,14 @@ Created on Fri Jul  1 08:51:02 2022
 import os
 import pandas as pd
 
-file_directory = r"C:/Users/Tim M/Documents/GitHub/BastianLab/WorkingPython/AxonTracing_TM 2"
+file_directory = r"C:\Users\TimMonko\Documents\GitHub\BastianLab\WorkingPython\AxonTracing_TM 2"
 os.chdir(file_directory)
 
-filepath = r"C:/Users/Tim M/Documents/GitHub/BastianLab/WorkingPython/AxonTracing_TM 2\Combined_TM.csv"
+filepath = r"C:\Users\TimMonko\Documents\GitHub\BastianLab\WorkingPython\AxonTracing_TM 2\Combined_TM.csv"
 raw_data = pd.read_csv(filepath)
 
 data = raw_data
-
+data = data[data.Primary_Axon_Length < 1200]
 data_describe = data.groupby("Tx").describe()
 
 #%% Pinguoin Stats
@@ -38,15 +38,11 @@ for dvs in data.columns[data.columns != 'Tx']:
 #%% Seaborn Settings for Plotting
 import seaborn as sns
 import matplotlib.pyplot as plt
+from statannotations.Annotator import Annotator # https://github.com/trevismd/statannotations
 #statsannotations for the future https://levelup.gitconnected.com/statistics-on-seaborn-plots-with-statannotations-2bfce0394c00
 
 # must explicitely invoke set_them else uses matplotlib defaults. Overrides all matplotlib based plots
-sns.set_theme(
-    style = "darkgrid",
-    context = "notebook",
-    palette = "colorblind",
-    ) # explicility invoked else uses matplotlib defaults
-# plt.style.use() # 
+sns.set_theme(style = "darkgrid", context = "notebook", palette = "colorblind") 
 
 #%% Discrete plotting
 
@@ -59,9 +55,14 @@ def box_swarm_plot(x, y, data, ylabel):
 
     ax.set_xlabel(None)
     ax.set_ylabel(ylabel)
+    annotator = Annotator(ax, pairs = [("Control", "DFO")], data = data, x = x, y = y)
+    annotator.configure(test = 'Mann-Whitney', text_format = 'star', loc = 'inside')
+    annotator.apply_and_annotate()
     return ax
 
 plots = []
+
+#box_swarm_plot('Tx', 'Num_Branches', data, 'Num_Branches')
 
 for dvs in data.columns[data.columns != 'Tx']:
     plot = box_swarm_plot('Tx', dvs, data, dvs)
@@ -77,38 +78,21 @@ pp = sns.pairplot(data, hue = "Tx", kind = 'reg') # default is scatter
 
 #%% Seaborn Relational Plotting
 
-r = sns.lmplot(
-    x = 'Primary_Axon_Length', 
-    y = 'Num_Branches', 
-    hue = 'Tx', 
-    data = data)
+def lm_plot(x, y, data = data, hue = 'Tx'):
+    r = sns.lmplot(x = x, y = y, data = data, hue = hue)
+    r.legend.set_title("Treatment")
+    return r
 
-
-r = sns.lmplot(
-    y = 'Num_Branches', 
-    x = 'Total_Branch_Length', 
-    hue = 'Tx', 
-    data = data)
-
-r = sns.lmplot(
-    x = 'Average_Branch_Length', 
-    y = 'Num_Branches', 
-    hue = 'Tx', 
-    data = data)
-
-r.legend.set_title("Treatment")
-#r.set_xlabels("Avg. Branch Length")
-#r.set_ylabels("Num. Branches")
+r = lm_plot("Primary_Axon_Length", "Num_Branches")
+r.axes[0,0].set_xlabel("Primary Axon Length, um")
+r.axes[0,0].set_ylabel("Number of Branches")
+r = lm_plot(x = "Primary_Axon_Length", y= "Average_Branch_Length")
+r = lm_plot("Num_Branches", "Total_Branch_Length")
+r = lm_plot(x = "Num_Branches", y = "Average_Branch_Length")
 
 plt.show()
 r.figure.savefig('LmPlot.svg')
 #%% Kde plot
-
-j = sns.jointplot(
-    data = data,
-    x = 'Primary_Axon_Length',
-    y = 'Num_Branches',
-    hue = 'Tx')
 
 j = sns.jointplot(
     data = data,
@@ -125,23 +109,25 @@ import statsmodels.api as sm
 from statsmodels.formula.api import ols
 
 # OLS model -- a "complicated" look at ANOVA stats, C() forces categorical
+
+
 model = ols('Num_Branches ~ Primary_Axon_Length * C(Tx)', data = data).fit()
-model = ols('Total_Branch_Length ~ Num_Branches * C(Tx)', data = data).fit()
+model = ols('Primary_Axon_Length ~ Num_Branches * C(Tx)', data = data).fit()
 model = ols('Num_Branches ~ Average_Branch_Length * C(Tx)', data = data).fit()
 
 #print(model.summary()) # very overwhelming output
 # So, push the model through the ANOVA to simplify the output 
-anova_table = sm.stats.anova_lm(model, typ = 2)
+anova_table = sm.stats.anova_lm(model, typ = 2) # Type 2 Sum iof Squares if no intereaction b/w independent variables, Type 3 if there is interaction. Never use Type 1. Type 3 appears to be same as regression
 anova_table
 
 # Outliers with statsmodels
 #test = model.outlier_test()
 #outliers_test = test[test['bonf(p)'] < 0.05]
+#%% Multivariate statsmodels
 
 from statsmodels.multivariate.manova import MANOVA
 
-fit = MANOVA.from_formula('Num_Branches + Average_Branch_Length ~ C(Tx)', data = data)
-
+fit = MANOVA.from_formula('Num_Branches * Primary_Axon_Length ~ C(Tx)', data = data)
 print(fit.mv_test())
 
-
+pg.box_m(data, dvs = ['Num_Branches', 'Primary_Axon_Length'], group = 'Tx')

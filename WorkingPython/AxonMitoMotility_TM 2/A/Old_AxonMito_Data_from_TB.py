@@ -9,8 +9,9 @@ Created on Fri Jul  1 08:51:02 2022
 import os
 import pandas as pd
 import glob
+import numpy as np
 
-file_directory = r"C:/Users/Tim M/Documents/GitHub/BastianLab/WorkingPython/AxonMitoMotility_TM 2/A"
+file_directory = r"C:\Users\TimMonko\Documents\GitHub\BastianLab\WorkingPython\AxonMitoMotility_TM 2\A"
 os.chdir(file_directory)
 
 file_type = "*.csv"
@@ -24,9 +25,12 @@ for file in filenames:
                  .melt(value_name = val_name, var_name = 'Tx')
                  .set_index('Tx'))
     data_list.append(melt_data)
-    
-data = pd.concat(data_list, axis = 1, ignore_index = False).dropna(axis = 0).reset_index()
 
+data = pd.concat(data_list, axis = 1, ignore_index = False).dropna(axis = 0).reset_index()
+data = data.assign(Log = lambda data: np.log(data['Average Speed (per Mito)']))
+data = data.assign(Log2 = lambda data: np.log(data['Percent Time Moving']))
+
+data = data.assign(Per = lambda data: data['Percent Time Moving'] / 100)
 data_describe = data.groupby("Tx").describe()
 
 #%% Pinguoin Stats
@@ -50,15 +54,11 @@ for dvs in data.columns[data.columns != 'Tx']:
 #%% Seaborn Settings for Plotting
 import seaborn as sns
 import matplotlib.pyplot as plt
+from statannotations.Annotator import Annotator # https://github.com/trevismd/statannotations
 #statsannotations for the future https://levelup.gitconnected.com/statistics-on-seaborn-plots-with-statannotations-2bfce0394c00
 
 # must explicitely invoke set_them else uses matplotlib defaults. Overrides all matplotlib based plots
-sns.set_theme(
-    style = "darkgrid",
-    context = "notebook",
-    palette = "colorblind",
-    ) # explicility invoked else uses matplotlib defaults
-# plt.style.use() # 
+sns.set_theme(style = "darkgrid", context = "notebook", palette = "colorblind") 
 
 #%% Discrete plotting
 
@@ -71,6 +71,9 @@ def box_swarm_plot(x, y, data, ylabel):
 
     ax.set_xlabel(None)
     ax.set_ylabel(ylabel)
+    annotator = Annotator(ax, pairs = [("IS", "ID")], data = data, x = x, y = y)
+    annotator.configure(test = 'Mann-Whitney', text_format = 'star', loc = 'inside')
+    annotator.apply_and_annotate()
     return ax
 
 plots = []
@@ -86,17 +89,26 @@ for dvs in data.columns[data.columns != 'Tx']:
 #quick and dirty, but caution on amount of variables
 
 pp = sns.pairplot(data, hue = "Tx", kind = 'reg') # default is scatter
-pp = sns.pairplot(data, hue = "Tx", kind = 'kde') # default is scatter
 
-#%% Seaborn Relational Plotting
-a = sns.residplot(x = 'Average Speed (per Mito)', y = 'Percent Time Moving', data = data)
+#%% Residual plotting to test for linearity of data
+a = sns.residplot(x = 'Log', y = 'Percent Time Moving', data = data)
+
+#%%
 
 r = sns.lmplot(
-    x = 'Percent Time Anterograde Motion', 
-    y = 'Average Speed (per Mito)', 
+    x = 'Average Speed (per Mito)',
+    y = 'Per',
+    data = data,
+    hue = 'Tx',
+    logistic = True)
+#%% Seaborn Relational Plotting
+
+
+r = sns.lmplot(
+    x = 'Pause Frequency (per Mito)', 
+    y = 'Log', 
     hue = 'Tx', 
     data = data)
-
 
 r = sns.lmplot(
     x = 'Average Speed (per Mito)', 
@@ -104,6 +116,19 @@ r = sns.lmplot(
     hue = 'Tx', 
     data = data,
     logx = True)
+
+r = sns.lmplot(
+    x = 'Log', 
+    y = 'Percent Time Moving', 
+    hue = 'Tx', 
+    data = data)
+
+r = sns.lmplot(
+    x = 'Log', 
+    y = 'Log2', 
+    hue = 'Tx', 
+    data = data,
+    robust = True)
 
 r = sns.lmplot(
     x = 'Average_Branch_Length', 
@@ -121,24 +146,26 @@ r.figure.savefig('LmPlot.svg')
 
 j = sns.jointplot(
     data = data,
-    x = 'Primary_Axon_Length',
-    y = 'Num_Branches',
+    x = 'Average Speed (per Mito)',
+    y = 'Percent Time Moving',
     hue = 'Tx')
 
 j = sns.jointplot(
     data = data,
-    x = 'Primary_Axon_Length',
-    y = 'Num_Branches',
+    x = 'Average Speed (per Mito)',
+    y = 'Percent Time Moving',
     hue = 'Tx',
     kind = "kde")
 
 #%% Tidy Data statsmodels stats 
 # R like syntax, much more robust, but more complex 
 # https://www.statsmodels.org/stable/gettingstarted.html
+# Consider the importance of bounded data (i.e. percents) when modeling https://stats.stackexchange.com/questions/103731/what-are-the-issues-with-using-percentage-outcome-in-linear-regression
+
+
 
 import statsmodels.api as sm 
 from statsmodels.formula.api import ols
-import numpy as np
 
 # OLS model -- a "complicated" look at ANOVA stats, C() forces categorical
 model = ols('Q("Average Speed (per Mito)") ~ Q("Percent Time Moving") *  C(Tx)', data = data).fit()
@@ -153,6 +180,7 @@ anova_table
 # Outliers with statsmodels
 #test = model.outlier_test()
 #outliers_test = test[test['bonf(p)'] < 0.05]
+
 
 
 
