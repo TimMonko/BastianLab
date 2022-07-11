@@ -37,7 +37,8 @@ import numpy as np
 import pandas as pd
 
 def gaussian_blur_label(image, gaussian_sigma):
-    blur = cle.gaussian_blur(image, None, gaussian_sigma, gaussian_sigma, 0)
+    bg = cle.subtract_gaussian_background(image, None, 20.0, 20.0, 0.0)
+    blur = cle.gaussian_blur(bg, None, gaussian_sigma, gaussian_sigma, 0)
     threshold = cle.threshold_otsu(blur)
     labels = cle.connected_components_labeling_box(threshold)
     return(labels)
@@ -98,13 +99,28 @@ for file in filenames:
         img.set_scene(scene)
      
         MAP2 = img.get_image_dask_data("YX", C = img.channel_names.index("AF647"))
-        MAP2_crop = cle.crop(MAP2, start_x = 5000, start_y = 5000, width = 3000, height = 3000)
-        MAP2_labels = gaussian_blur_label(MAP2_crop, 8)
+        ##
+        ## REPLACE ZERO WITH MEAN INTENSITY
+        ##
+        MAP2_mi = cle.mean_of_all_pixels(MAP2)
+        MAP2_rp = cle.replace_intensity(MAP2, value_to_replace = 0, value_replacement = MAP2_mi)
+        MAP2_bg = cle.subtract_gaussian_background(MAP2, None, 20.0, 20.0, 0.0)
+
+        MAP2_blur = cle.gaussian_blur(MAP2_bg, None, 8, 8, 0)
+        MAP2_threshold = cle.threshold_otsu(MAP2_blur)
+        MAP2_labels = cle.connected_components_labeling_box(MAP2_threshold)
+
+        # #MAP2_crop = cle.crop(MAP2, start_x = 5000, start_y = 5000, width = 3000, height = 3000)
+        # MAP2_labels = gaussian_blur_label(MAP2, 8)
     
     
         DAPI = img.get_image_dask_data("YX", C = img.channel_names.index("DAPI"))
-        DAPI_crop = cle.crop(DAPI, start_x = 5000, start_y = 5000, width = 3000, height = 3000)
-        DAPI_labels = gaussian_blur_label(DAPI_crop, 2)
+        #DAPI_crop = cle.crop(DAPI, start_x = 5000, start_y = 5000, width = 3000, height = 3000)
+        DAPI_bg = cle.subtract_gaussian_background(DAPI, None, 20.0, 20.0, 0.0)
+        DAPI_blur = cle.gaussian_blur(DAPI_bg, None, 2, 2, 0)
+        DAPI_threshold = cle.threshold_otsu(DAPI_blur)
+        DAPI_labels = cle.connected_components_labeling_box(DAPI_threshold)
+        # DAPI_labels = gaussian_blur_label(DAPI, 2)
     
         overlap_count =  cle.label_overlap_count_map(DAPI_labels, MAP2_labels)
         overlap_labels =  cle.connected_components_labeling_box(overlap_count)
@@ -129,7 +145,7 @@ for file in filenames:
         print(summary)
         
         fsave = output_directory + file + img.current_scene + "_labels.tif"
-        stacked_results = np.stack((MAP2_crop, DAPI_crop, MAP2_labels, DAPI_labels, overlap_labels), axis = 0).astype(np.uint16)
+        stacked_results = np.stack((MAP2, DAPI, MAP2_labels, DAPI_labels, overlap_labels), axis = 0).astype(np.uint16)
         imsave(fsave, stacked_results, check_contrast = False)
         
         print("took ", time.time() - start, "seconds")
@@ -146,8 +162,11 @@ import napari
 
 viewer = napari.Viewer()
 
-viewer.add_image(MAP2_crop)
-viewer.add_image(DAPI_crop)
+viewer.add_image(MAP2)
+viewer.add_image(DAPI)
 viewer.add_labels(MAP2_labels)
 viewer.add_labels(DAPI_labels)
 viewer.add_labels(overlap_labels)
+
+viewer.add_image(MAP2_bg)
+viewer.add_image(MAP2_blur)
